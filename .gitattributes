@@ -1,0 +1,41 @@
+# Every tracked text file is stored with LF and checked out with LF, on every
+# platform and whatever a contributor's core.autocrlf happens to be. Without this
+# the bytes that reach the repository depend on the machine they were written on,
+# which produces diffs nobody made and, once a formatter check exists, a
+# formatter that disagrees with itself between machines.
+#
+# text=auto lets git decide what is text; eol=lf fixes the direction for
+# everything it decided was text, on the way in and on the way out.
+* text=auto eol=lf
+
+# Bytes rather than text. These are never converted in either direction, and
+# marking them keeps them out of the text checks and out of diffs that would be
+# unreadable anyway. Subject media is the reason most of this list exists: this
+# project ingests plate images, and an image that git tried to normalise would be
+# a corrupted image.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.tif binary
+*.tiff binary
+*.fits binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.woff binary
+*.woff2 binary
+
+# Exceptions to the normalisation above go here, by path, each carrying the
+# reason it is excluded on the line above it. The case this list exists for is a
+# fixture that proves behaviour on a particular byte sequence: normalising it
+# would silently delete the byte the fixture is about, the test would then pass
+# for the wrong reason, and nothing would say so. Such a path is declared -text
+# and never left to text=auto.
+#
+# There is no such path in the tree today. This paragraph is the whole of the
+# list, and it is written out rather than left empty so the next person adding a
+# fixture finds the rule at the place they would break it.

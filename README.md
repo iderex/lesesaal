@@ -1,6 +1,22 @@
 # lesesaal
 
-Zooniverse is open source and in practice not self-hostable: Panoptes is only the API, and a campaign also needs Cellect, Nero, ZooEventStats and Warehouse. A group with 2,000 images and ten volunteers ends up in Google Forms. This is docker compose up for a classification campaign, with active learning built in so the model proposes and humans correct only the uncertain cases. It feeds plattenschrank, whose binding constraint is label scarcity.
+Zooniverse is open source and in practice not self-hostable. Its API component's
+development composition starts four services before anything is added to it:
+
+    $ gh api repos/zooniverse/panoptes/contents/docker-compose.yml --jq .content | base64 -d | sed -n '/^services:/,/^volumes:/p' | grep -E '^  [a-z_]+:'
+      postgres:
+      redis:
+      panoptes:
+      sidekiq:
+
+A group with 2,000 images and ten volunteers ends up in Google Forms. That is a
+claim rather than a measurement, and so is the rest of this paragraph. This is
+docker compose up for a classification campaign, with active learning built in so
+the model proposes and humans correct only the uncertain cases. It feeds
+plattenschrank, whose binding constraint is label scarcity.
+
+Issue #2 holds the evidence for the gap, including what has been measured and
+what has not.
 
 Planning happens on the issue tracker first. Every decision that shapes
 the architecture is written down there with its reasons before the code

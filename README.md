@@ -22,4 +22,7 @@ Planning happens on the issue tracker first. Every decision that shapes
 the architecture is written down there with its reasons before the code
 that depends on it exists.
 
-See [NOTICE.md](NOTICE.md) for the intended-use notice.
+See [NOTICE.md](NOTICE.md) for the intended-use notice, and
+[docs/scope-of-use.md](docs/scope-of-use.md) for what this is built for and the
+specific things it is not built for. Nothing in the software enforces that
+statement.

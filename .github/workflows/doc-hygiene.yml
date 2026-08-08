@@ -1,0 +1,315 @@
+# Documentation lint (#96). The documents in this tree are part of the product:
+# an install guide that has drifted is a defect, and a pointer to a file that was
+# renamed is how a plan quietly stops being a plan. This is the check that
+# refuses the machine-decidable half of that.
+#
+# Three legs run on every branch and every pull request, because all three are
+# deterministic and depend on nothing outside this repository. A fourth leg,
+# external links, runs on a schedule instead, and the reason is at that job.
+#
+# WHAT THIS DELIBERATELY DOES NOT CHECK, so a green run is not read as more than
+# it is:
+#
+#   Prose quality, grammar and readability. Not machine decidable, and a check
+#   that pretends otherwise produces noise a contributor learns to ignore.
+#
+#   Whether a document is TRUE. A guide can pass every leg here and describe
+#   software that does something else. That is what a review is for.
+#
+#   Spelling. It needs a project dictionary, and the dictionary is supposed to
+#   hold the terms from the vocabulary document, which does not exist yet: #5
+#   owes it. A dictionary assembled before it would fix the spelling of words
+#   the project has not agreed on. #96 stays open on this leg.
+#
+#   Heading anchors. A link to `docs/foo.md#some-heading` is checked as far as
+#   `docs/foo.md` and the fragment is ignored, so a renamed heading is not
+#   caught. Adding it means deriving GitHub's own anchor slugs, which is a
+#   guess at somebody else's renderer.
+#
+#   Link text. Whether "see the federation document" points at the federation
+#   document is a judgement about meaning.
+#
+#   Anything that is not a tracked `*.md` file. The workflow files, the DCO and
+#   the attributes file carry prose in comments and no leg here reads it.
+#
+#   Line endings and encoding. Those are text-hygiene's, they are already
+#   refused there, and this workflow reads the checkout rather than the index
+#   because of it.
+name: doc-hygiene
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  # The external link leg only. See the reason at that job.
+  schedule:
+    - cron: "37 5 * * 1"
+  workflow_dispatch:
+
+# Read-only: every leg reads the checkout and nothing writes.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  documents:
+    name: Documentation formatting, paths and internal links
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Refuse a tracked document that is not formatted for readable diffs
+        run: |
+          set -euo pipefail
+          # The convention this enforces is the one the tree already follows:
+          # prose is hard wrapped, so a one-word edit produces a one-line diff
+          # instead of reflowing a paragraph and hiding the change inside it.
+          #
+          # Measured before this leg landed, over every tracked *.md outside
+          # fenced and indented code blocks: 85 lines at 81 columns, one at 82,
+          # nothing longer. 81 is therefore the tree's own limit rather than a
+          # number chosen here, and the single line at 82 was rewrapped in the
+          # change that added this leg.
+          #
+          # Code blocks are exempt in both spellings. A pasted command and its
+          # output must stay byte-exact, and wrapping one would make it a
+          # command nobody can run.
+          files=$(git ls-files '*.md')
+          if [ -z "$files" ]; then
+            echo "::error::No tracked document was examined. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          count=$(printf '%s\n' "$files" | wc -l)
+          fail=0
+          # A file whose last byte is not a newline, or which ends in a blank
+          # line, produces a diff on the last line of the next change that
+          # touches it.
+          while IFS= read -r f; do
+            if [ ! -s "$f" ]; then
+              echo "FAIL  $f is empty"
+              fail=1
+              continue
+            fi
+            if [ "$(tail -c 1 "$f" | wc -l)" -ne 1 ]; then
+              echo "FAIL  $f does not end with a newline"
+              fail=1
+            fi
+            if [ -z "$(tail -n 1 "$f")" ]; then
+              echo "FAIL  $f ends with a blank line"
+              fail=1
+            fi
+          done <<< "$files"
+          if ! printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 awk '
+            FNR == 1 { infence = 0; prev = "SOF" }
+            {
+              line = $0
+              if (line ~ /^```/) { infence = !infence; prev = line; next }
+              incode = (infence || line ~ /^    /)
+              if (line ~ /[ \t]+$/) { print "FAIL  " FILENAME ":" FNR " has trailing whitespace"; bad = 1 }
+              if (line ~ /\t/)      { print "FAIL  " FILENAME ":" FNR " contains a tab"; bad = 1 }
+              if (line == "" && prev == "") { print "FAIL  " FILENAME ":" FNR " is the second of two blank lines"; bad = 1 }
+              if (!incode && length(line) > 81) {
+                print "FAIL  " FILENAME ":" FNR " is " length(line) " columns, over the 81 this tree wraps at"
+                bad = 1
+              }
+              lines++
+              prev = line
+            }
+            END {
+              printf "Examined %d line(s) for formatting.\n", lines
+              if (lines == 0) { print "FAIL  no line was examined"; bad = 1 }
+              exit bad ? 1 : 0
+            }'; then
+            fail=1
+          fi
+          echo "Examined $count tracked document(s) for formatting."
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Tracked document(s) above are not formatted the way this tree stores documents. Wrap prose at 81 columns, drop trailing whitespace and tabs, and end the file with one newline."
+            exit 1
+          fi
+          echo "Every tracked document is formatted for readable diffs."
+
+      - name: Refuse a document naming a path that does not exist
+        # Always report, so a formatting failure above cannot hide a dangling
+        # path here and send somebody round the loop twice.
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # This is the leg that earns the workflow. This plan depends on
+          # documents pointing at each other, at the workflows and at the
+          # attributes file, and a pointer to something renamed is invisible
+          # until somebody follows it.
+          #
+          # A path-like token is one written in backticks that holds a slash or
+          # ends in a known extension. It resolves relative to the directory of
+          # the document naming it first, then from the repository root, which
+          # is how the documents under docs/ already name their siblings. A
+          # directory counts as resolved. Tokens inside code blocks are skipped:
+          # a pasted transcript names paths in other repositories and this tree
+          # cannot resolve those.
+          files=$(git ls-files '*.md')
+          if [ -z "$files" ]; then
+            echo "::error::No tracked document was examined. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          tokens=$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 awk '
+            FNR == 1 { infence = 0 }
+            /^```/ { infence = !infence; next }
+            {
+              if (infence || $0 ~ /^    /) next
+              line = $0
+              while (match(line, /`[^`]+`/)) {
+                tok = substr(line, RSTART + 1, RLENGTH - 2)
+                if (tok ~ /^[A-Za-z0-9_.][A-Za-z0-9_.\/-]*$/ && (tok ~ /\// || tok ~ /\.(md|yml|yaml|json|toml|go|txt|sum|mod)$/))
+                  print FILENAME "\t" tok
+                line = substr(line, RSTART + RLENGTH)
+              }
+            }')
+          fail=0
+          examined=0
+          if [ -n "$tokens" ]; then
+            while IFS=$'\t' read -r src tok; do
+              examined=$((examined + 1))
+              dir=$(dirname "$src")
+              if [ -e "$dir/$tok" ] || [ -e "$tok" ]; then
+                continue
+              fi
+              echo "FAIL  $src names $tok, which does not exist"
+              fail=1
+            done <<< "$tokens"
+          fi
+          echo "Examined $examined path reference(s) in $(printf '%s\n' "$files" | wc -l) tracked document(s)."
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Document(s) above name a path that does not exist. Name no path you do not intend to resolve."
+            exit 1
+          fi
+          echo "Every path a document names resolves."
+
+      - name: Refuse an internal link that goes nowhere
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # Markdown link targets that are not http(s) and not a bare fragment.
+          # The fragment on a local target is stripped and not checked; the
+          # comment at the top of this file says so and says why.
+          files=$(git ls-files '*.md')
+          if [ -z "$files" ]; then
+            echo "::error::No tracked document was examined. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          links=$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 awk '
+            FNR == 1 { infence = 0 }
+            /^```/ { infence = !infence; next }
+            {
+              if (infence) next
+              line = $0
+              while (match(line, /\]\([^)]*\)/)) {
+                t = substr(line, RSTART + 2, RLENGTH - 3)
+                if (t !~ /^https?:/ && t !~ /^mailto:/ && t !~ /^#/ && t != "")
+                  print FILENAME "\t" t
+                line = substr(line, RSTART + RLENGTH)
+              }
+            }')
+          fail=0
+          examined=0
+          if [ -n "$links" ]; then
+            while IFS=$'\t' read -r src target; do
+              examined=$((examined + 1))
+              path=${target%%#*}
+              if [ -z "$path" ]; then
+                continue
+              fi
+              dir=$(dirname "$src")
+              if [ -e "$dir/$path" ] || [ -e "$path" ]; then
+                continue
+              fi
+              echo "FAIL  $src links to $target, which does not exist"
+              fail=1
+            done <<< "$links"
+          fi
+          echo "Examined $examined internal link(s) in $(printf '%s\n' "$files" | wc -l) tracked document(s)."
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Link(s) above go nowhere. A link in a document is a promise that the thing at the other end exists."
+            exit 1
+          fi
+          echo "Every internal link resolves."
+
+  external-links:
+    name: External links
+    # On a schedule and on request, never on a pull request. An external link
+    # check on every pull request makes this repository's gate depend on
+    # somebody else's uptime: a change to one document reds because an unrelated
+    # site is down for ten minutes, which teaches a contributor to re-run a red
+    # check until it passes, and that habit costs more than the dead link.
+    # Weekly finds a dead link within a week of it dying, which is soon enough
+    # for a link in a document and cheap enough to leave running.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Report an external link that no longer resolves
+        run: |
+          set -euo pipefail
+          # Unlike the legs above, zero is a real answer here rather than a
+          # broken run: this tree may legitimately carry no external link at
+          # all, and it carried none when this workflow landed. The count is
+          # printed either way so a run that examined nothing cannot be read as
+          # a run that examined everything and found nothing.
+          files=$(git ls-files '*.md')
+          if [ -z "$files" ]; then
+            echo "::error::No tracked document was examined. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          urls=$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 awk '
+            FNR == 1 { infence = 0 }
+            /^```/ { infence = !infence; next }
+            {
+              if (infence) next
+              line = $0
+              while (match(line, /\]\(https?:[^)]*\)/)) {
+                print substr(line, RSTART + 2, RLENGTH - 3)
+                line = substr(line, RSTART + RLENGTH)
+              }
+            }' | sort -u)
+          if [ -z "$urls" ]; then
+            echo "Examined 0 external link(s). This tree carries none."
+            exit 0
+          fi
+          fail=0
+          count=0
+          while IFS= read -r u; do
+            count=$((count + 1))
+            # A HEAD first, then a GET, because a site refusing HEAD is common
+            # and is not a dead link. --max-time bounds a hanging host.
+            if curl -sSfL --max-time 20 -o /dev/null -I "$u" 2>/dev/null; then
+              continue
+            fi
+            if curl -sSfL --max-time 20 -o /dev/null "$u" 2>/dev/null; then
+              continue
+            fi
+            echo "FAIL  $u did not resolve"
+            fail=1
+          done <<< "$urls"
+          echo "Examined $count external link(s)."
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::External link(s) above did not resolve. Repair or remove them; this leg runs on a schedule and does not block a pull request."
+            exit 1
+          fi
+          echo "Every external link resolved."

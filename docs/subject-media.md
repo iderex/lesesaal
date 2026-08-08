@@ -44,8 +44,8 @@ That is not an exception to the position, it is the position not holding.
 
 Recorded as the answer to that check: object storage is not in the default
 deployment and is not offered as a switch today. Where it arrives later it
-arrives as a federation mode with the rest of them, defined in the federation
-document that #16 owes, and not as a storage setting.
+arrives as a federation mode with the rest of them, defined in `federation.md`,
+and not as a storage setting.
 
 The other three options keep every byte on the host, so the check does not
 constrain the choice between them.

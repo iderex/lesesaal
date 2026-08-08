@@ -167,12 +167,15 @@ it reached and why it had to, and leave the merge to whoever holds that path.
 
 ## The checks a change can trip
 
-The workflow files are the authority rather than this list. Here is the command
-and what it printed at the commit this guide landed on:
+The workflow files are the authority rather than this list, and a check that
+lands after this paragraph was last touched will be in them and not in it. Run
+the command rather than trusting the paste:
 
     git grep -n '^    name:' -- .github/workflows/
     .github/workflows/build.yml:47:    name: Build
+    .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
+    .github/workflows/dependency-lock.yml:73:    name: Dependency lock
     .github/workflows/doc-hygiene.yml:60:    name: Documentation formatting, paths and internal links
     .github/workflows/doc-hygiene.yml:249:    name: External links
     .github/workflows/lint.yml:60:    name: Formatting, vet and lint
@@ -186,7 +189,11 @@ One job deliberately carries no name so that its check run takes the job id
 instead, which is `dependency-review`, and its own comment says why.
 
 What each one refuses, in the order above. `Build` compiles every package with
-dependency resolution switched off. `DCO sign-off` is the section above.
+dependency resolution switched off. `Code scanning (CodeQL)` reads the Go source
+for a security defect and reds on any finding, which `docs/code-scanning.md`
+argues. `DCO sign-off` is the section above. `Dependency lock` refuses a module
+file that is not what the tree's imports require, and `docs/dependencies.md` is
+the inventory behind it.
 `Documentation formatting, paths and internal links` refuses a document that is
 not wrapped the way this tree wraps, that names a path which does not exist, or
 that links to something which is not there. `External links` follows the links

@@ -23,6 +23,7 @@ A required check is matched by its literal check-run name, so the list has to be
 quoted rather than described.
 
     git grep -n '^  *name:' -- .github/workflows/
+    .github/workflows/build.yml:47:    name: Build
     .github/workflows/dco.yml:24:    name: DCO sign-off
     .github/workflows/doc-hygiene.yml:60:    name: Documentation formatting, paths and internal links
     .github/workflows/doc-hygiene.yml:249:    name: External links
@@ -61,11 +62,19 @@ on a push as well as on a pull request reports twice, and the repeated lines are
 cut rather than shown. Nothing else follows them.
 
 Every name in the blocking list below appears there and was green, so requiring
-them freezes nothing.
+them freezes nothing. `Build` is the exception and only because it did not exist
+when that output was taken: its verdict is recorded on the pull request that
+landed the build check, and it is quoted there rather than restated here.
 
 ## The blocking list, in the order to add it
 
 Each name is exactly as it appears above.
+
+`Build`. It compiles every package in the tree with the toolchain the module
+declares and with dependency resolution switched off, so a change that does not
+compile, or that imports something the module file does not carry, cannot reach
+the default branch. It is first in the list because every later check is
+measured against a tree that builds.
 
 `DCO sign-off`. It is the only thing standing between an unsigned commit and the
 default branch, and this project cannot accept a contribution whose author never
@@ -126,15 +135,16 @@ leaves none.
 
 ## This request is repeated rather than made once
 
-The list is bounded by what exists at the moment it is asked for. The build
-check, the unit test check, the lint and format check and the code scanning
-analysis are all still to be written, in #19 through #25, and each one adds its
-check-run name here in the change that lands it. The quality milestone is where
-the list is compared against the reference gate, which is #89's work rather than
-this document's.
+The list is bounded by what exists at the moment it is asked for. `Build` was
+added to it by the change that landed the build check, which is what this
+section asks of every later one. The unit test check, the lint and format check,
+the bill of materials and the code scanning analysis are still to be written, in
+#20 through #25, and each adds its check-run name here in the change that lands
+it. The quality milestone is where the list is compared against the reference
+gate, which is #89's work rather than this document's.
 
-Until the ruleset carries the six names above, #31 stays open. What closes it is
-the ruleset showing them, not this document existing.
+Until the ruleset carries the seven names above, #31 stays open. What closes it
+is the ruleset showing them, not this document existing.
 
 ## One thing found while writing this
 

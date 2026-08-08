@@ -1,0 +1,100 @@
+# The build check (#19). The first check that judges code rather than text: it
+# compiles every package in the tree from a clean checkout, with the toolchain
+# the module declares and with dependency resolution switched off.
+#
+# Its check-run name is `Build` and that name is part of the contract. The
+# branch protection request in docs/required-checks.md quotes check-run names
+# literally, so renaming this job silently removes the requirement rather than
+# renaming it.
+#
+# WHAT THIS DELIBERATELY DOES NOT DO, so a green run is not read as more than it
+# is:
+#
+#   It does not run tests. There are none yet, and the unit test check is #20
+#   with its own check-run name and its own requirements about display,
+#   elevation and network.
+#
+#   It does not format, vet or lint. #22 owns those three legs. This job would
+#   pass a tree that is correct and ugly.
+#
+#   It does not build a container image or a release artefact. #74 and #118 own
+#   those.
+#
+# ON WARNINGS. The issue behind this check asks that the build fail on any
+# compiler or toolchain warning. This toolchain has no warning level to switch
+# on: the things another compiler would warn about, an unused variable and an
+# unused import among them, are refused as errors by construction. So the strict
+# setting the issue asks for is already the only setting, and the proof is a red
+# run rather than a flag in this file.
+name: build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# Read-only: nothing here writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Install the toolchain the module declares
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # Read the version from go.mod rather than repeating it here, so the
+          # module file stays the one place the toolchain version is declared.
+          go-version-file: go.mod
+          # The dependency set is empty, so there is nothing to cache and a
+          # cache step would only add a restore that can fail. #23 is where the
+          # dependency graph arrives and where this is revisited.
+          cache: false
+
+      - name: Refuse a build that would resolve a dependency the module does not carry
+        run: |
+          set -euo pipefail
+          # -mod=readonly refuses to add or update a requirement to satisfy an
+          # import. A file importing something the module file does not list
+          # fails here rather than being silently resolved, which is the shape a
+          # stale lock file takes in this toolchain. `go mod verify` checks that
+          # every downloaded module still matches its recorded hash; with an
+          # empty dependency set it verifies nothing and says so, and it is here
+          # so that the leg exists before the first dependency does.
+          go mod verify
+          go list -mod=readonly ./... > /dev/null
+          echo "The module resolves with dependency resolution disabled."
+
+      - name: Build every package, and say how many were built
+        # Always report, so a failure above cannot hide a compile failure here
+        # and send somebody round the loop twice.
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # A run that built nothing is not a run that built everything and
+          # found no error, so an empty package list fails closed.
+          packages=$(go list -mod=readonly ./...)
+          if [ -z "$packages" ]; then
+            echo "::error::No package was built. Failing closed rather than reporting a clean build."
+            exit 1
+          fi
+          count=$(printf '%s\n' "$packages" | wc -l)
+          printf '%s\n' "$packages"
+          echo "Building $count package(s) with the toolchain $(go version)."
+          go build -mod=readonly ./...
+          echo "Every package built."

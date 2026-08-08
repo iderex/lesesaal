@@ -99,8 +99,8 @@ ships no address for one.
 
 The start-up self check prints, every time, which modes are on and where each one
 sends. An operator who did not intend to federate finds out on the next restart
-rather than from somebody else, and an operator who did intended it and can read
-the confirmation. #85 owes that line.
+rather than from somebody else, and an operator who did intend it can read the
+confirmation. #85 owes that line.
 
 There is no user interface control that switches federation on. It is a
 configuration change on the host, made by the person who runs the host.

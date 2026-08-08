@@ -72,13 +72,18 @@ jobs:
           # -mod=readonly refuses to add or update a requirement to satisfy an
           # import. A file importing something the module file does not list
           # fails here rather than being silently resolved, which is the shape a
-          # stale lock file takes in this toolchain. `go mod verify` checks that
-          # every downloaded module still matches its recorded hash; with an
-          # empty dependency set it verifies nothing and says so, and it is here
-          # so that the leg exists before the first dependency does.
+          # stale lock file takes in this toolchain. The -deps is what makes
+          # this leg bite: without it the listing names the packages in the tree
+          # and never looks at what they import, so it passes a tree the build
+          # step then refuses. Measured, on the proof branch for this check.
+          #
+          # `go mod verify` checks that every downloaded module still matches
+          # its recorded hash. With an empty dependency set it verifies nothing
+          # and says so, and it is here so the leg exists before the first
+          # dependency does.
           go mod verify
-          go list -mod=readonly ./... > /dev/null
-          echo "The module resolves with dependency resolution disabled."
+          go list -mod=readonly -deps ./... > /dev/null
+          echo "Every import resolves with dependency resolution disabled."
 
       - name: Build every package, and say how many were built
         # Always report, so a failure above cannot hide a compile failure here

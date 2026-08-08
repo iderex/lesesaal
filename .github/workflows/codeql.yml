@@ -1,0 +1,166 @@
+# Code scanning for the language this project is written in (#25). The
+# inherited workflows audit the automation and the text of this repository;
+# this is the first check that reads the code for a security defect, and it is
+# in place before the code it will judge rather than after it.
+#
+# Its check-run name is `Code scanning (CodeQL)` and that name is part of the
+# contract. docs/required-checks.md quotes check-run names literally, so
+# renaming this job silently removes a requirement rather than renaming it.
+#
+# THE QUERY SET IS `security-extended` AND THE ARGUMENT FOR IT IS IN
+# docs/code-scanning.md, together with what was not chosen and why. It is named
+# once, in the environment block below, and both the analyser input and the
+# sentence the run prints read it from there, so the workflow cannot say one
+# thing and run another.
+#
+# WHY THE BUILD FAILS ON A FINDING RATHER THAN ONLY REPORTING ONE. The analyser
+# uploads to the security dashboard on its own, and a dashboard nobody is forced
+# to read is where a finding goes to age. The leg at the bottom of this file is
+# what turns a finding into a red check, and it fails on any result the query
+# set reports rather than on a severity threshold: this tree has no code with a
+# history of noise to weigh that against, and a threshold chosen before the
+# first finding would be a guess presented as a policy. docs/code-scanning.md is
+# where that is revisited if it turns out to be wrong.
+#
+# WHAT THIS DELIBERATELY DOES NOT DO, so a green run is not read as more than it
+# is:
+#
+#   It does not analyse the workflow files. `Audit workflows (zizmor)` holds
+#   that surface, it reads them against what a workflow is permitted to do, and
+#   pointing a second analyser at the same files would produce two verdicts on
+#   one question. The languages input below names Go and nothing else.
+#
+#   It is not the second lens. #90 adds an analyser with a different one, and
+#   two analysers that agree by construction are one analyser.
+#
+#   It runs on a pull request and on the default branch, and on no schedule.
+#   Nothing here re-scans an unchanged tree when the analyser's own queries
+#   move, which is a real gap and is stated rather than closed: it costs a
+#   scheduled run per week and the argument for it belongs with #90's, where
+#   both analysers can be scheduled together instead of separately.
+#
+#   It proves nothing about a language this project does not yet contain. There
+#   is no browser code and no template in the tree, so the web surface #43
+#   builds arrives after this check rather than before it.
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ["**"]
+
+# Read-only at the top level; the job below adds the one scope it needs to
+# publish into the security dashboard.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The one place the query set is written down. The analyser input and the
+  # sentence the last leg prints both read it from here.
+  QUERY_SET: security-extended
+
+jobs:
+  codeql:
+    name: Code scanning (CodeQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # Clone the tree to be analysed.
+      contents: read
+      # Upload the result into the code-scanning dashboard, beside zizmor's and
+      # the scorecard's.
+      security-events: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Install the toolchain the module declares
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # Read the version from go.mod rather than repeating it here, so the
+          # module file stays the one place the toolchain version is declared,
+          # and so the analyser builds the tree with the toolchain the build
+          # check builds it with.
+          go-version-file: go.mod
+          # The dependency set is empty, so there is nothing to cache and a
+          # cache step would only add a restore that can fail. #23 is where the
+          # dependency graph arrives and where this is revisited.
+          cache: false
+
+      - name: Initialise the analyser
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          languages: go
+          # The tree compiles with one command and carries no generator, so the
+          # analyser's own build is enough and a hand-written one would be a
+          # second build to keep current.
+          build-mode: autobuild
+          queries: ${{ env.QUERY_SET }}
+
+      - name: Analyse, and write the result where a leg can read it
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          # The category names this analysis in the dashboard, so its findings
+          # stay distinguishable from zizmor's and the scorecard's.
+          category: codeql
+          # Without this the result is uploaded and never written to disk, and
+          # the leg below would have nothing to judge.
+          output: codeql-results
+
+      - name: Refuse an actionable finding
+        # Always report, so a failure above cannot hide a finding here and send
+        # somebody round the loop twice.
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # A COUNT THAT WAS NEVER TAKEN IS NOT A COUNT OF ZERO. An analysis
+          # that produced no document, a document that does not parse, and a
+          # tree with nothing in it to analyse all fail here rather than
+          # printing the sentence at the bottom.
+          results=$(find codeql-results -name '*.sarif' -type f | sort)
+          if [ -z "$results" ]; then
+            echo "::error::The analyser wrote no result document. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          sources=$(git ls-files '*.go' | wc -l)
+          if [ "$sources" -eq 0 ]; then
+            echo "::error::No Go file is tracked, so nothing was analysed. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          total=0
+          while IFS= read -r f; do
+            if ! jq -e 'has("runs") and (.runs | type == "array")' "$f" > /dev/null 2>&1; then
+              echo "::error::$f is not a readable result document. Failing closed rather than counting nothing."
+              exit 1
+            fi
+            tool=$(jq -r '[.runs[].tool.driver.name] | unique | join(", ")' "$f")
+            n=$(jq '[.runs[].results[]?] | length' "$f")
+            case "$n" in
+              ''|*[!0-9]*)
+                echo "::error::The finding count for $f came out as '$n', which is not a count. Failing closed rather than comparing it."
+                exit 1
+                ;;
+            esac
+            printf '  %s  tool=%s  finding(s)=%s\n' "$f" "$tool" "$n"
+            total=$((total + n))
+          done <<< "$results"
+          echo "Analysed $sources tracked Go file(s) with the $QUERY_SET query set. The analyser reported $total finding(s)."
+          if [ "$total" -ne 0 ]; then
+            echo "--- what it found ---"
+            while IFS= read -r f; do
+              jq -r '.runs[].results[]? |
+                "  \(.ruleId)  \(.message.text)  at \((.locations[0].physicalLocation.artifactLocation.uri) // "?"):\((.locations[0].physicalLocation.region.startLine) // 0)"' "$f"
+            done <<< "$results"
+            echo "::error::The analyser reported a finding on this tree. Fix it, or dismiss it with a written reason as docs/code-scanning.md requires. A dismissal with no reason is how a scanner becomes scenery."
+            exit 1
+          fi
+          echo "The analyser reports nothing on every tracked Go file."

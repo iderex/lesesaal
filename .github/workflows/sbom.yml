@@ -1,0 +1,283 @@
+# The bill of materials (#24). An operator running this on their own hardware
+# carries the responsibility for what is inside it, and a bill of materials is
+# what turns that from an act of faith into something they can check. It is also
+# what makes an advisory answerable in minutes: the question "is that package in
+# here, and at what version" is a grep against a file rather than an afternoon.
+#
+# It runs on the same events as the build check, so every commit that gets built
+# gets a document. Its check-run name is `Bill of materials` and that name is
+# part of the contract, because docs/required-checks.md quotes check-run names
+# literally.
+#
+# WHY IT IS NOT A STEP INSIDE build.yml, which is where "during the build" would
+# put it. Two reasons, and the first is the one that decides it. The build check
+# is what #23 revisits when the dependency graph arrives, and a second effort
+# editing the same file is the collision that costs a merge nobody can land. The
+# second is that `Build` means one thing today, that every package compiles, and
+# a reader should not have to work out whether a red `Build` was a compile
+# failure or an upload that timed out. The trigger set here is identical to the
+# build check's, so "every build" and "every run of this workflow" are the same
+# set of commits.
+#
+# WHAT THIS DELIBERATELY DOES NOT DO, so a green run is not read as more than it
+# is:
+#
+#   It does not cover a container image. There is no image in this tree; #74
+#   builds it. The document says so in its own creation comment rather than
+#   leaving a reader to assume either way, which is the condition #24 states.
+#
+#   It does not publish the document anywhere an operator can reach. It is a
+#   build artefact on the run, retrievable without rerunning the build, and that
+#   is as far as this issue goes. Publishing it beside a release is #120's, and
+#   the operator-readable notices are #109's.
+#
+#   It does not judge a licence, a vulnerability or a policy. #24 asks for the
+#   inventory. `dependency-review` refuses a newly introduced dependency with a
+#   known advisory, and that is a different check with a different failure.
+name: sbom
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# Read-only: nothing here writes to the repository. Uploading a run artefact
+# does not need a repository permission.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sbom:
+    name: Bill of materials
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Install the toolchain the module declares
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Install the generator
+        # Only the binary, not the wrapper action around it. What is generated
+        # and what is refused is decided in this file, in the open, rather than
+        # inside somebody else's action inputs.
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      - name: Say which catalogers this generator carries for the tree's ecosystems
+        run: |
+          set -euo pipefail
+          # Printed rather than assumed. Which catalogers exist and which are on
+          # by default is the generator's decision and it moves between
+          # versions, so the run says what it had rather than this file claiming
+          # what it has.
+          syft version
+          echo "--- catalogers matching go ---"
+          syft cataloger list -q 2>/dev/null | grep -i 'go' || echo "(none matched)"
+          echo "--- catalogers matching github ---"
+          syft cataloger list -q 2>/dev/null | grep -i 'github' || echo "(none matched)"
+
+      - name: Produce the document
+        if: ${{ !cancelled() }}
+        env:
+          # Through the environment rather than interpolated into the script, so
+          # the commit identifier cannot become script. Same reason zizmor gives
+          # for every other expression that reaches a run block.
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # SPDX 2.3 JSON. SPDX is ISO/IEC 5962, which is the format this
+          # project's standpoint reaches for first, and the JSON serialisation
+          # is the one a reader can answer an advisory question against with
+          # jq and nothing else.
+          #
+          # The GitHub Actions cataloger is named rather than relied on. `+`
+          # adds a cataloger to the default set rather than replacing the set,
+          # which would silently drop the Go one.
+          #
+          # THIS FLAG IS A NO-OP TODAY AND IS KEPT ANYWAY. The cataloger is
+          # already in this generator's default set for a directory scan, so
+          # dropping the flag changes nothing: measured by running this
+          # workflow with the line removed and comparing, which produced the
+          # same 23 entries, the same 8 distinct actions and the same 1 Go
+          # module. What the flag buys is the day the generator's defaults
+          # move. It would be a silent loss of an ecosystem otherwise, and the
+          # coverage leg below would be the only thing to notice.
+          #
+          # The name and version are given rather than derived from the
+          # directory path. A document that outlives its run has to say which
+          # commit it describes, or a reader has an inventory of an unknown
+          # tree; the generator also warns when it has to guess.
+          syft scan dir:. \
+            --select-catalogers '+github-actions-usage-cataloger' \
+            --source-name lesesaal \
+            --source-version "$HEAD_SHA" \
+            -o spdx-json=sbom.spdx.json
+          test -s sbom.spdx.json
+          jq -e 'has("packages") and (.packages | type == "array")' sbom.spdx.json > /dev/null
+          echo "Wrote $(wc -c < sbom.spdx.json) byte(s) of SPDX 2.3 JSON for $HEAD_SHA."
+
+      - name: State in the document what it does not cover
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # The condition on #24 is that the DOCUMENT states whether base image
+          # contents are included, not that a workflow comment does. A reader
+          # gets the file on its own, without this repository around it, so the
+          # sentence has to travel with it. creationInfo.comment is where SPDX
+          # 2.3 puts exactly this.
+          #
+          # This sentence is a negative disclosure. When an image arrives in
+          # #74 the repair is to cover the image, not to soften the sentence.
+          #
+          # The document is checked before it is edited. This step runs even
+          # when the step above failed, so that a reader sees every leg's
+          # verdict rather than only the first; that is worth having only if a
+          # leg reached by a broken document refuses instead of carrying on
+          # over an absent or unparseable one.
+          if ! jq -e 'has("packages") and (.packages | type == "array")' sbom.spdx.json > /dev/null 2>&1; then
+            echo "::error::There is no readable SPDX document to annotate. Failing closed rather than writing a disclosure onto nothing."
+            exit 1
+          fi
+          note='This document covers the source tree of this repository only. Base image contents are NOT included: this project builds no container image yet, and the image is issue #74. Ecosystems covered are the Go module and the GitHub Actions used by the workflows.'
+          tmp=$(mktemp)
+          jq --arg note "$note" '.creationInfo.comment = $note' sbom.spdx.json > "$tmp"
+          # The edited document replaces the original only once it is known to
+          # parse. Otherwise a failed edit overwrites a good document with an
+          # empty file and every leg after it reads that instead.
+          jq -e 'has("packages")' "$tmp" > /dev/null
+          mv "$tmp" sbom.spdx.json
+          jq -r '.creationInfo.comment' sbom.spdx.json
+
+      - name: Refuse a document that does not cover every ecosystem in the tree
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # A COUNT THAT IS NOT A NUMBER IS NOT A COUNT OF ZERO. This leg once
+          # printed the sentence at the bottom of it over a document that was
+          # never written: the comparisons were reached with empty strings,
+          # `[ "" -eq 0 ]` reported "integer expression expected" and returned
+          # non-zero, and a non-zero status inside an `if` is a false condition
+          # rather than an error, so `set -e` never fired and the leg passed.
+          # Found on the proof branch for this workflow.
+          #
+          # So the document is checked before anything is counted, and every
+          # count is checked to be a number before it is compared.
+          if ! jq -e 'has("packages") and (.packages | type == "array")' sbom.spdx.json > /dev/null 2>&1; then
+            echo "::error::There is no readable SPDX document to judge. Failing closed rather than reporting a covered tree."
+            exit 1
+          fi
+          require_number() {
+            case "$2" in
+              ''|*[!0-9]*)
+                echo "::error::$1 came out as '$2', which is not a count. Failing closed rather than comparing it."
+                exit 1
+                ;;
+            esac
+          }
+          # THIS IS THE LEG THAT EARNS THE WORKFLOW. A generator that quietly
+          # stops cataloging an ecosystem produces a smaller document and a
+          # green tick, and the smaller document is the one an operator would
+          # answer an advisory from. So the expected count per ecosystem is
+          # derived from the tree, by the toolchain and by git, and compared
+          # against what the document holds.
+          #
+          # BOTH SIDES ARE COUNTED OVER DISTINCT COMPONENTS. The generator emits
+          # one entry per place a thing is used, so the checkout action appears
+          # once per workflow that runs it, and a raw entry count would compare
+          # usages against components. Measured on the first run of this
+          # workflow: 21 entries carrying 8 distinct GitHub Actions.
+          #
+          # Go. `go list -m all` prints the main module and then every module
+          # the graph requires. The main module is counted on both sides,
+          # because the generator catalogs it as a component of the tree and it
+          # is one. So the whole listing is the expectation rather than the
+          # listing minus its first line, and the requirement count today is
+          # zero.
+          expected_go=$(go list -mod=readonly -m all | wc -l)
+          # GitHub Actions. Every `uses:` in a workflow is one action this
+          # repository depends on at build time.
+          expected_actions=$(grep -rhoE '^\s*uses:\s*\S+' .github/workflows/ \
+            | sed -E 's/^\s*uses:\s*//' | sort -u | wc -l)
+
+          require_number "expected_go" "$expected_go"
+          require_number "expected_actions" "$expected_actions"
+
+          total=$(jq '.packages | length' sbom.spdx.json)
+          require_number "the document's entry count" "$total"
+          if [ "$total" -eq 0 ]; then
+            echo "::error::The document holds no package at all. Failing closed rather than shipping an inventory of nothing."
+            exit 1
+          fi
+
+          echo "--- distinct component(s) per ecosystem, as the document holds them ---"
+          jq -r '
+            [ .packages[]
+              | ((.externalRefs // [])[] | select(.referenceType == "purl") | .referenceLocator)
+            ]
+            | unique
+            | map(sub("^pkg:";"") | split("/")[0])
+            | group_by(.) | map({type: .[0], count: length})
+            | .[] | "  \(.type)\t\(.count)"' sbom.spdx.json
+          nopurl=$(jq '[.packages[] | select(([(.externalRefs // [])[] | select(.referenceType == "purl")] | length) == 0)] | length' sbom.spdx.json)
+          printf '  %s\t%s\n' "(no purl)" "$nopurl"
+          printf '  %s\t%s\n' "entries in total" "$total"
+
+          count_type() {
+            jq --arg t "$1" '[ .packages[]
+              | ((.externalRefs // [])[] | select(.referenceType == "purl") | .referenceLocator)
+              | select(startswith("pkg:" + $t + "/")) ] | unique | length' sbom.spdx.json
+          }
+          observed_go=$(count_type golang)
+          observed_actions=$(count_type github)
+          require_number "observed_go" "$observed_go"
+          require_number "observed_actions" "$observed_actions"
+
+          echo "--- expected from the tree, observed in the document ---"
+          printf '  golang   expected %s   observed %s\n' "$expected_go" "$observed_go"
+          printf '  github   expected %s   observed %s\n' "$expected_actions" "$observed_actions"
+
+          fail=0
+          if [ "$observed_go" -ne "$expected_go" ]; then
+            echo "FAIL  the Go ecosystem is covered for $observed_go module(s) and the module graph holds $expected_go"
+            fail=1
+          fi
+          if [ "$observed_actions" -ne "$expected_actions" ]; then
+            echo "FAIL  the GitHub Actions ecosystem is covered for $observed_actions action(s) and the workflows pin $expected_actions"
+            fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::The document does not cover every ecosystem in this tree. A bill of materials that is missing an ecosystem is worse than none, because it answers an advisory question with a confident wrong answer."
+            exit 1
+          fi
+          echo "Every ecosystem in the tree is covered, at the count the tree declares."
+
+      - name: Attach the document to the build output
+        # success() rather than !cancelled(), unlike every leg above it. The
+        # generator creates its output file before it validates its arguments,
+        # so a generation that fails leaves an empty sbom.spdx.json behind, and
+        # an upload on !cancelled() attached that empty file and reported
+        # success while the job was red. Measured on the proof branch: 144
+        # bytes uploaded, artifact id 9024097010. Nothing is attached unless
+        # the document was produced, annotated and judged.
+        if: ${{ success() }}
+        # Retrievable without rerunning the build, which is the condition. The
+        # retention is the repository default; #120 is where a document that
+        # outlives a run is published beside a release.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-spdx-json
+          path: sbom.spdx.json
+          if-no-files-found: error

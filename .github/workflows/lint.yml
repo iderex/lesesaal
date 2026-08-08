@@ -1,0 +1,155 @@
+# The formatting, vet and lint check (#22). Formatting arguments are a tax on
+# every later review and the only way to stop paying it is to make formatting a
+# verdict rather than a preference. Three legs, in the order a reader wants
+# them: the formatter reports no difference, the toolchain's own correctness
+# analyser is clean, and the linter set this project chose is clean.
+#
+# Its check-run name is `Formatting, vet and lint` and that name is part of the
+# contract. The branch protection request in docs/required-checks.md quotes
+# check-run names literally, so renaming this job silently removes the
+# requirement rather than renaming it.
+#
+# Every leg says what it examined and fails closed on an empty selection. A run
+# that judged nothing and a run that judged everything and found nothing print
+# the same word otherwise, and only one of them is worth a green tick. Every leg
+# after the first carries if !cancelled(), so one failing leg cannot hide the
+# next and send somebody round the loop twice.
+#
+# WHAT THIS DELIBERATELY DOES NOT DO, so a green run is not read as more than it
+# is:
+#
+#   It does not format the documents. `*.md` is judged by the doc-hygiene
+#   workflow, which refuses trailing whitespace, tabs, a missing final newline
+#   and a prose line over 81 columns. That is where the markup half of #22
+#   lives, it landed before this file did, and duplicating it here would give
+#   the tree two formatters that can disagree.
+#
+#   IT DOES NOT FORMAT THE CONFIGURATION FILES, AND #22 ASKS FOR THAT. There is
+#   no YAML formatter in this tree and this change does not add one. The
+#   workflow files here carry more comment than YAML, in a layout chosen so the
+#   argument reads in order, and every general purpose YAML formatter reflows or
+#   relocates comments. Choosing one is a decision about which of them preserves
+#   this layout, and it is not made here. What judges these files today is
+#   zizmor for what they are permitted to do and actionlint for nothing, because
+#   actionlint is not wired in either. Both gaps are stated rather than closed.
+#
+#   It does not run tests. #20 owns the unit test check, with its own
+#   requirements about display, elevation and network.
+#
+#   It does not judge whether a suppression is justified. staticcheck.conf says
+#   a suppression carries its check identifier and a reason; nothing here reads
+#   the reason, and the quality milestone is where that becomes a check.
+name: lint
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# Read-only: nothing here writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Formatting, vet and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Install the toolchain the module declares
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # Read the version from go.mod rather than repeating it here, so the
+          # module file stays the one place the toolchain version is declared.
+          go-version-file: go.mod
+          # The dependency set is empty, so there is nothing to cache. #23 is
+          # where the dependency graph arrives and where this is revisited.
+          cache: false
+
+      - name: Refuse a Go file the formatter would change
+        run: |
+          set -euo pipefail
+          # gofmt ships with the toolchain, so this leg costs no tool and no
+          # version to keep current. The file list comes from git rather than
+          # from a directory walk: what is being judged is what the repository
+          # stores, and a build directory or an editor backup left in the
+          # checkout is neither.
+          files=$(git ls-files '*.go')
+          if [ -z "$files" ]; then
+            echo "::error::No tracked Go file was examined. Failing closed rather than reporting a formatted tree."
+            exit 1
+          fi
+          count=$(printf '%s\n' "$files" | wc -l)
+          # -l lists the files that differ from their formatted form. It is
+          # silent and exits 0 on a clean tree, so the list rather than the
+          # exit code is what decides this leg.
+          bad=$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 gofmt -l)
+          echo "Examined $count tracked Go file(s) with the gofmt from $(go version)."
+          if [ -n "$bad" ]; then
+            printf '%s\n' "$bad" | sed 's/^/FAIL  /'
+            echo "--- what the formatter would change ---"
+            printf '%s\n' "$bad" | tr '\n' '\0' | xargs -0 gofmt -d
+            echo "::error::Go file(s) above are not in the form gofmt produces. Run 'gofmt -w' over them."
+            exit 1
+          fi
+          echo "Every tracked Go file is already in the form gofmt produces."
+
+      - name: Refuse a finding from the toolchain's own correctness analyser
+        # Always report, so a formatting failure above cannot hide an analyser
+        # finding here.
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # -mod=readonly for the same reason the build check uses it: a file
+          # importing something go.mod does not list fails here rather than
+          # being silently resolved.
+          packages=$(go list -mod=readonly ./...)
+          if [ -z "$packages" ]; then
+            echo "::error::No package was analysed. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          count=$(printf '%s\n' "$packages" | wc -l)
+          printf '%s\n' "$packages"
+          echo "Analysing $count package(s) with go vet from $(go version)."
+          go vet -mod=readonly ./...
+          echo "go vet reports nothing on every package."
+
+      - name: Refuse a finding from the linter set this project chose
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # Installed by pinned version rather than by an action, and installed
+          # as a program rather than as a requirement of this module: 'go
+          # install pkg@version' resolves outside the main module, so go.mod and
+          # the empty dependency set the build check guards are untouched. The
+          # module proxy's checksum database is what makes the pin mean a fixed
+          # set of bytes. GOFLAGS is cleared for this one command because
+          # -mod=readonly is a statement about this module and this command is
+          # not about this module.
+          GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
+          packages=$(go list -mod=readonly ./...)
+          if [ -z "$packages" ]; then
+            echo "::error::No package was linted. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          count=$(printf '%s\n' "$packages" | wc -l)
+          # The enabled set is staticcheck.conf's, read from the module root, so
+          # this command and a contributor's bare 'staticcheck ./...' judge the
+          # same checks. No -checks flag is passed here on purpose.
+          available=$(staticcheck -list-checks | wc -l)
+          printf '%s\n' "$packages"
+          echo "Linting $count package(s) with $(staticcheck -version), $available check(s) available and the enabled set fixed by staticcheck.conf."
+          staticcheck ./...
+          echo "The linter reports nothing on every package."

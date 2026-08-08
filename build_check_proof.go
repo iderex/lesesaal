@@ -1,11 +1,8 @@
 // This file exists to be refused by the build check. It is never merged.
 //
-// The variable below is declared and never used, which this toolchain refuses
-// as an error rather than reporting as a warning. It is the one-character
-// mistake somebody actually makes, rather than a file that could not have
-// compiled under any circumstances.
+// It imports a package the module file does not carry. With dependency
+// resolution disabled the build refuses it rather than quietly adding a
+// requirement, which is the shape a stale lock file takes in this toolchain.
 package main
 
-func buildCheckProof() {
-	unusedByDesign := 1
-}
+import _ "golang.org/x/text/language"

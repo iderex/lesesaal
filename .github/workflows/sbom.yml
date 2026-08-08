@@ -265,7 +265,14 @@ jobs:
           echo "Every ecosystem in the tree is covered, at the count the tree declares."
 
       - name: Attach the document to the build output
-        if: ${{ !cancelled() }}
+        # success() rather than !cancelled(), unlike every leg above it. The
+        # generator creates its output file before it validates its arguments,
+        # so a generation that fails leaves an empty sbom.spdx.json behind, and
+        # an upload on !cancelled() attached that empty file and reported
+        # success while the job was red. Measured on the proof branch: 144
+        # bytes uploaded, artifact id 9024097010. Nothing is attached unless
+        # the document was produced, annotated and judged.
+        if: ${{ success() }}
         # Retrievable without rerunning the build, which is the condition. The
         # retention is the repository default; #120 is where a document that
         # outlives a run is published beside a release.

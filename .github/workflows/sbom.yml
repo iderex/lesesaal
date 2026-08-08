@@ -91,6 +91,11 @@ jobs:
 
       - name: Produce the document
         if: ${{ !cancelled() }}
+        env:
+          # Through the environment rather than interpolated into the script, so
+          # the commit identifier cannot become script. Same reason zizmor gives
+          # for every other expression that reaches a run block.
+          HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           # SPDX 2.3 JSON. SPDX is ISO/IEC 5962, which is the format this
@@ -102,11 +107,18 @@ jobs:
           # for a directory scan, so it is selected by name. `+` adds a
           # cataloger to the default set rather than replacing the set, which
           # would silently drop the Go one.
+          #
+          # The name and version are given rather than derived from the
+          # directory path. A document that outlives its run has to say which
+          # commit it describes, or a reader has an inventory of an unknown
+          # tree; the generator also warns when it has to guess.
           syft scan dir:. \
             --select-catalogers '+github-actions-usage-cataloger' \
+            --source-name lesesaal \
+            --source-version "$HEAD_SHA" \
             -o spdx-json=sbom.spdx.json
           test -s sbom.spdx.json
-          echo "Wrote $(wc -c < sbom.spdx.json) byte(s) of SPDX 2.3 JSON."
+          echo "Wrote $(wc -c < sbom.spdx.json) byte(s) of SPDX 2.3 JSON for $HEAD_SHA."
 
       - name: State in the document what it does not cover
         if: ${{ !cancelled() }}
@@ -137,15 +149,21 @@ jobs:
           # derived from the tree, by the toolchain and by git, and compared
           # against what the document holds.
           #
-          # Go. `go list -m all` prints the main module first and then every
-          # module the graph requires, so the requirement count is that listing
-          # minus its first line. Zero is a legitimate answer today and the
-          # comparison is what makes zero mean "none, and the generator agrees"
-          # rather than "the cataloger did not run".
-          expected_go=$(go list -mod=readonly -m all | tail -n +2 | wc -l)
+          # BOTH SIDES ARE COUNTED OVER DISTINCT COMPONENTS. The generator emits
+          # one entry per place a thing is used, so the checkout action appears
+          # once per workflow that runs it, and a raw entry count would compare
+          # usages against components. Measured on the first run of this
+          # workflow: 21 entries carrying 8 distinct GitHub Actions.
+          #
+          # Go. `go list -m all` prints the main module and then every module
+          # the graph requires. The main module is counted on both sides,
+          # because the generator catalogs it as a component of the tree and it
+          # is one. So the whole listing is the expectation rather than the
+          # listing minus its first line, and the requirement count today is
+          # zero.
+          expected_go=$(go list -mod=readonly -m all | wc -l)
           # GitHub Actions. Every `uses:` in a workflow is one action this
-          # repository depends on at build time. Deduplicated, because the same
-          # action pinned once is one component however many jobs use it.
+          # repository depends on at build time.
           expected_actions=$(grep -rhoE '^\s*uses:\s*\S+' .github/workflows/ \
             | sed -E 's/^\s*uses:\s*//' | sort -u | wc -l)
 
@@ -155,33 +173,34 @@ jobs:
             exit 1
           fi
 
-          echo "--- component count per ecosystem, as the document holds them ---"
+          echo "--- distinct component(s) per ecosystem, as the document holds them ---"
           jq -r '
             [ .packages[]
               | ((.externalRefs // [])[] | select(.referenceType == "purl") | .referenceLocator)
             ]
+            | unique
             | map(sub("^pkg:";"") | split("/")[0])
             | group_by(.) | map({type: .[0], count: length})
             | .[] | "  \(.type)\t\(.count)"' sbom.spdx.json
           nopurl=$(jq '[.packages[] | select(([(.externalRefs // [])[] | select(.referenceType == "purl")] | length) == 0)] | length' sbom.spdx.json)
-          echo "  (no purl)\t$nopurl"
-          echo "  total\t$total"
+          printf '  %s\t%s\n' "(no purl)" "$nopurl"
+          printf '  %s\t%s\n' "entries in total" "$total"
 
           count_type() {
             jq --arg t "$1" '[ .packages[]
               | ((.externalRefs // [])[] | select(.referenceType == "purl") | .referenceLocator)
-              | select(startswith("pkg:" + $t + "/")) ] | length' sbom.spdx.json
+              | select(startswith("pkg:" + $t + "/")) ] | unique | length' sbom.spdx.json
           }
           observed_go=$(count_type golang)
           observed_actions=$(count_type github)
 
           echo "--- expected from the tree, observed in the document ---"
-          echo "  golang   expected $expected_go   observed $observed_go"
-          echo "  github   expected $expected_actions   observed $observed_actions"
+          printf '  golang   expected %s   observed %s\n' "$expected_go" "$observed_go"
+          printf '  github   expected %s   observed %s\n' "$expected_actions" "$observed_actions"
 
           fail=0
           if [ "$observed_go" -ne "$expected_go" ]; then
-            echo "FAIL  the Go ecosystem is covered for $observed_go module(s) and the module graph requires $expected_go"
+            echo "FAIL  the Go ecosystem is covered for $observed_go module(s) and the module graph holds $expected_go"
             fail=1
           fi
           if [ "$observed_actions" -ne "$expected_actions" ]; then

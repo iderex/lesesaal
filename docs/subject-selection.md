@@ -48,8 +48,8 @@ should be read as a starting position rather than a result.
 A volunteer rarely sees a subject twice. Held exactly rather than rarely: the
 eligible set excludes subjects this volunteer has already answered, so a repeat
 is impossible rather than unlikely. The cost is that the selection needs to know
-what this volunteer has answered, which is the reliability question in #39 and the
-identity question in #13 arriving together at the same place.
+what this volunteer has answered, which is the reliability question in #39 and
+the identity question in #13 arriving together at the same place.
 
 Two volunteers working at the same time are mostly not given the same subject.
 Held by the hold. The first draw takes the subject out of the eligible set for

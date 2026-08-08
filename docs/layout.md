@@ -19,12 +19,15 @@ paragraph somebody remembers.
     .
     +-- main.go                   the one entry point and the only wiring
     +-- layout_test.go            the guard behind this document
+    +-- harness_test.go           the guard behind harness.md
     +-- go.mod                    the module and the toolchain it declares
     +-- internal/
     |   +-- campaign/             the campaign core
+    |   |   +-- campaigntest/     the fakes a test injects
     |   +-- model/                the model interface
     |   +-- store/                the storage layer
     |   |   +-- migration/        changes to the store's own shape
+    |   +-- system/               the real values behind the injected ones
     |   +-- web/                  the surface
     +-- deploy/                   deployment assets
     +-- test/                     harnesses the unit suite cannot host
@@ -42,6 +45,18 @@ tasks, options, answers, classifications, labels and retirement in the words
 classification means and when a subject is finished; it does not hold a
 handler, a query, a file path, a model or anything else that would make the
 core need one of them present to run.
+
+`internal/campaign/campaigntest/` holds the fakes a test injects in place of
+the runtime, which are a clock a test moves, a draw that repeats, an identifier
+source that counts and a dialler that refuses; it does not hold a test, and
+nothing but a test file may import it, because a fake clock reaching the binary
+an operator runs would be a deployment whose time does not move.
+
+`internal/system/` holds the real values behind `campaign.Depends`, which are
+the wall clock, the random source, the identifier generator and the outbound
+dialler; it does not hold a rule, a handler or anything a test would want to
+stand in for, because it is the one directory permitted to read the runtime and
+everything in it is therefore unreachable from a deterministic suite.
 
 `internal/model/` holds the model interface, which is what a model is given
 when it scores a subject, what a proposal is and how a proposal is recorded,
@@ -89,14 +104,16 @@ Everything points inward, at the core. Read the table as: a file in the
 directory on the left may import the packages on the right and no other package
 inside this module.
 
-    from                        may import inside this module
-    .                           every part below
-    internal/campaign           nothing
-    internal/model              internal/campaign
-    internal/store              internal/campaign
-    internal/store/migration    internal/campaign
-    internal/web                internal/campaign, internal/model
-    deploy, test, docs          no compiled code lives there
+    from                            may import inside this module
+    .                               every part below
+    internal/campaign               nothing
+    internal/campaign/campaigntest  internal/campaign
+    internal/model                  internal/campaign
+    internal/store                  internal/campaign
+    internal/store/migration        internal/campaign
+    internal/system                 internal/campaign
+    internal/web                    internal/campaign, internal/model
+    deploy, test, docs              no compiled code lives there
 
 Imports of the standard library are not this rule's subject and are not
 restricted by it. What the module may depend on from outside itself is the
@@ -122,6 +139,13 @@ through `main.go`, and an import is such a route.
 Anything importing `deploy/` or `test/`. They are the ends of the tree rather
 than parts of it: the program is what gets deployed and what gets tested, and a
 dependency in that direction inverts both.
+
+Two of the parts above are refused in a direction this table cannot express, and
+`harness_test.go` holds both. `internal/system` may be imported only from the
+entry point, so the real clock enters the program in one place. And
+`internal/campaign/campaigntest` may be imported only from a test file, which is
+a rule about the kind of file rather than about the directory it sits in.
+`harness.md` is where both are argued.
 
 `main.go` may import everything, and it is the only file that may. Wiring the
 parts together is a job somewhere, and putting it in the one place that is not
@@ -171,11 +195,17 @@ The harnesses that need a browser, a container runtime or real media are
 
 ## What is not here yet
 
-Every directory in the tree above holds a placeholder rather than code:
+Most of the tree above still holds a placeholder rather than code:
 `deploy/README.md`, `test/README.md`, `internal/store/migration/README.md`, and
-a package comment in each of the four Go packages. Each says what it is waiting
-for and which issue brings it. A placeholder is replaced by the first real
-thing that lands, not kept beside it.
+a package comment in `internal/model/doc.go`, `internal/store/doc.go` and
+`internal/web/doc.go`. Each says what it is waiting for and which issue brings
+it. A placeholder is replaced by the first real thing that lands, not kept
+beside it.
+
+Three directories now hold code. `internal/campaign` holds the dependencies the
+program takes rather than reads, `internal/system` holds the real values behind
+them, and `internal/campaign/campaigntest` holds the fakes. All three arrived
+with #21 and `harness.md` is where they are argued.
 
 Ingest, export and subject media have no directory here, and that is deliberate
 rather than an omission. Where each one goes is decided by the direction rule

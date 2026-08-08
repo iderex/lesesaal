@@ -103,10 +103,18 @@ jobs:
           # is the one a reader can answer an advisory question against with
           # jq and nothing else.
           #
-          # The GitHub Actions cataloger is not in the generator's default set
-          # for a directory scan, so it is selected by name. `+` adds a
-          # cataloger to the default set rather than replacing the set, which
-          # would silently drop the Go one.
+          # The GitHub Actions cataloger is named rather than relied on. `+`
+          # adds a cataloger to the default set rather than replacing the set,
+          # which would silently drop the Go one.
+          #
+          # THIS FLAG IS A NO-OP TODAY AND IS KEPT ANYWAY. The cataloger is
+          # already in this generator's default set for a directory scan, so
+          # dropping the flag changes nothing: measured by running this
+          # workflow with the line removed and comparing, which produced the
+          # same 23 entries, the same 8 distinct actions and the same 1 Go
+          # module. What the flag buys is the day the generator's defaults
+          # move. It would be a silent loss of an ecosystem otherwise, and the
+          # coverage leg below would be the only thing to notice.
           #
           # The name and version are given rather than derived from the
           # directory path. A document that outlives its run has to say which

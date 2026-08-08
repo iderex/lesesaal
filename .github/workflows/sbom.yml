@@ -126,6 +126,7 @@ jobs:
             --source-version "$HEAD_SHA" \
             -o spdx-json=sbom.spdx.json
           test -s sbom.spdx.json
+          jq -e 'has("packages") and (.packages | type == "array")' sbom.spdx.json > /dev/null
           echo "Wrote $(wc -c < sbom.spdx.json) byte(s) of SPDX 2.3 JSON for $HEAD_SHA."
 
       - name: State in the document what it does not cover
@@ -140,9 +141,23 @@ jobs:
           #
           # This sentence is a negative disclosure. When an image arrives in
           # #74 the repair is to cover the image, not to soften the sentence.
+          #
+          # The document is checked before it is edited. This step runs even
+          # when the step above failed, so that a reader sees every leg's
+          # verdict rather than only the first; that is worth having only if a
+          # leg reached by a broken document refuses instead of carrying on
+          # over an absent or unparseable one.
+          if ! jq -e 'has("packages") and (.packages | type == "array")' sbom.spdx.json > /dev/null 2>&1; then
+            echo "::error::There is no readable SPDX document to annotate. Failing closed rather than writing a disclosure onto nothing."
+            exit 1
+          fi
           note='This document covers the source tree of this repository only. Base image contents are NOT included: this project builds no container image yet, and the image is issue #74. Ecosystems covered are the Go module and the GitHub Actions used by the workflows.'
           tmp=$(mktemp)
           jq --arg note "$note" '.creationInfo.comment = $note' sbom.spdx.json > "$tmp"
+          # The edited document replaces the original only once it is known to
+          # parse. Otherwise a failed edit overwrites a good document with an
+          # empty file and every leg after it reads that instead.
+          jq -e 'has("packages")' "$tmp" > /dev/null
           mv "$tmp" sbom.spdx.json
           jq -r '.creationInfo.comment' sbom.spdx.json
 
@@ -150,6 +165,28 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          # A COUNT THAT IS NOT A NUMBER IS NOT A COUNT OF ZERO. This leg once
+          # printed the sentence at the bottom of it over a document that was
+          # never written: the comparisons were reached with empty strings,
+          # `[ "" -eq 0 ]` reported "integer expression expected" and returned
+          # non-zero, and a non-zero status inside an `if` is a false condition
+          # rather than an error, so `set -e` never fired and the leg passed.
+          # Found on the proof branch for this workflow.
+          #
+          # So the document is checked before anything is counted, and every
+          # count is checked to be a number before it is compared.
+          if ! jq -e 'has("packages") and (.packages | type == "array")' sbom.spdx.json > /dev/null 2>&1; then
+            echo "::error::There is no readable SPDX document to judge. Failing closed rather than reporting a covered tree."
+            exit 1
+          fi
+          require_number() {
+            case "$2" in
+              ''|*[!0-9]*)
+                echo "::error::$1 came out as '$2', which is not a count. Failing closed rather than comparing it."
+                exit 1
+                ;;
+            esac
+          }
           # THIS IS THE LEG THAT EARNS THE WORKFLOW. A generator that quietly
           # stops cataloging an ecosystem produces a smaller document and a
           # green tick, and the smaller document is the one an operator would
@@ -175,7 +212,11 @@ jobs:
           expected_actions=$(grep -rhoE '^\s*uses:\s*\S+' .github/workflows/ \
             | sed -E 's/^\s*uses:\s*//' | sort -u | wc -l)
 
+          require_number "expected_go" "$expected_go"
+          require_number "expected_actions" "$expected_actions"
+
           total=$(jq '.packages | length' sbom.spdx.json)
+          require_number "the document's entry count" "$total"
           if [ "$total" -eq 0 ]; then
             echo "::error::The document holds no package at all. Failing closed rather than shipping an inventory of nothing."
             exit 1
@@ -201,6 +242,8 @@ jobs:
           }
           observed_go=$(count_type golang)
           observed_actions=$(count_type github)
+          require_number "observed_go" "$observed_go"
+          require_number "observed_actions" "$observed_actions"
 
           echo "--- expected from the tree, observed in the document ---"
           printf '  golang   expected %s   observed %s\n' "$expected_go" "$observed_go"

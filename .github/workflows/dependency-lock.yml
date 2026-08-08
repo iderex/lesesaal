@@ -1,0 +1,141 @@
+# The dependency lock (#23). Everything the quality milestone asks for assumes
+# the dependency set is known. A project that resolves versions at build time
+# has no such set, so a scan of it proves nothing about what will be installed
+# tomorrow.
+#
+# Its check-run name is `Dependency lock` and that name is part of the contract.
+# docs/required-checks.md quotes check-run names literally, so renaming this job
+# silently removes a requirement rather than renaming it.
+#
+# WHY IT IS NOT A STEP INSIDE build.yml, which already runs two neighbouring
+# commands. The first reason is that `Build` means one thing today, that every
+# package compiles, and a reader should not have to work out whether a red
+# `Build` was a compile failure or a module file somebody forgot to tidy. The
+# second is that the build check belongs to #19 and this belongs to #23, and a
+# second effort editing one file is the collision that costs a merge nobody can
+# land. The trigger set here is identical to the build check's, so "every build"
+# and "every run of this workflow" are the same set of commits.
+#
+# WHAT THIS ADDS THAT THE BUILD CHECK DOES NOT, measured rather than assumed. A
+# requirement in the module file that nothing in the tree imports passes the
+# build check: `go list -mod=readonly -deps` and `go build -mod=readonly` both
+# report success on it, because every import still resolves. The same tree fails
+# here. Run at d5ed98f with a `require golang.org/x/text v0.3.8` line appended to
+# the module file and nothing importing it:
+#
+#     go list -mod=readonly -deps ./... > /dev/null ; echo $?
+#     0
+#     go mod tidy -diff ; echo $?
+#     diff current/go.mod tidy/go.mod
+#     --- current/go.mod
+#     +++ tidy/go.mod
+#     @@ -1,5 +1,3 @@
+#     -require golang.org/x/text v0.3.8
+#     1
+#
+# The unchanged context lines of that diff are cut and nothing else is.
+#
+# The direction the build check already covers is the opposite one and is not
+# repeated here: an import the module file does not carry, or a module the lock
+# file does not carry, fails there with `missing go.sum entry`.
+#
+# WHAT THIS DELIBERATELY DOES NOT DO, so a green run is not read as more than it
+# is:
+#
+#   It does not judge a version. Whether a pinned version is the right one, or
+#   carries an advisory, is `dependency-review`'s and the bill of materials'.
+#
+#   It does not reach the tools a workflow installs inside a run block. Those
+#   are pinned by a version string today and nothing refuses a floating
+#   spelling. docs/dependencies.md names them, says what the pin does and does
+#   not buy, and that gap is stated there rather than closed here.
+#
+#   It does not reach the actions the workflows use. Those are pinned by commit
+#   sha and `Audit workflows (zizmor)` refuses an unpinned one.
+name: dependency-lock
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# Read-only: nothing here writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lock:
+    name: Dependency lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Install the toolchain the module declares
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # Read the version from go.mod rather than repeating it here, so the
+          # module file stays the one place the toolchain version is declared.
+          go-version-file: go.mod
+          # The dependency set is empty, so there is nothing to cache and a
+          # restore is one more thing that can fail. This line is what changes
+          # on the day the set stops being empty.
+          cache: false
+
+      - name: Say what the dependency set and its lock are today
+        run: |
+          set -euo pipefail
+          # Printed before anything is judged, so a reader can tell a run over
+          # an empty dependency set from a run over a full one. `go list -m all`
+          # prints the main module and then every module the graph requires, so
+          # a line count of one is a graph with no requirement in it.
+          modules=$(go list -mod=readonly -m all)
+          if [ -z "$modules" ]; then
+            echo "::error::The module graph came out empty, which not even a module with no requirement does. Failing closed rather than judging nothing."
+            exit 1
+          fi
+          count=$(printf '%s\n' "$modules" | wc -l)
+          printf '%s\n' "$modules" | sed 's/^/  /'
+          echo "The module graph holds $count entry, including this module itself."
+          # The lock file is created by the toolchain the moment a requirement
+          # needs one, so its absence and an empty requirement set are the same
+          # fact rather than two. Saying which state the tree is in keeps a
+          # green run from being read as "the lock file was checked".
+          if [ -f go.sum ]; then
+            echo "The lock file holds $(wc -l < go.sum) line(s)."
+          else
+            echo "There is no lock file, because nothing outside this module is required yet."
+          fi
+
+      - name: Refuse a module file the lock cannot account for
+        # Always report, so a failure above cannot hide this verdict and send
+        # somebody round the loop twice.
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # -diff reports what a tidy run WOULD change and changes nothing, so
+          # this is a verdict rather than a repair. The distinction is the whole
+          # point: a check that fixed the module file would let a drifted one
+          # land and then quietly correct it, and nobody would ever see the
+          # drift that a stale requirement or a missing lock entry represents.
+          #
+          # It exits non-zero when the module file or the lock file is not what
+          # the imports in the tree require, in either direction: a requirement
+          # nothing imports, an import nothing requires, or a lock file that
+          # does not cover the graph.
+          if go mod tidy -diff; then
+            echo "The module file and the lock file are exactly what the tree's imports require."
+            exit 0
+          fi
+          echo "::error::The module file or the lock file is not what the tree's imports require. The diff above is what 'go mod tidy' would change; run it and commit the result rather than letting a build resolve around it."
+          exit 1

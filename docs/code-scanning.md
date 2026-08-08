@@ -9,6 +9,22 @@ starts at zero and stays there or fails.
 The check is `.github/workflows/codeql.yml` and its check-run name is
 `Code scanning (CodeQL)`.
 
+## Two names appear on a pull request, and only one of them is this one
+
+    gh pr checks 152 --json name,state --jq '.[] | select(.name | test("CodeQL"))
+      | "\(.name) | \(.state)"'
+    CodeQL | SUCCESS
+    Code scanning (CodeQL) | SUCCESS
+
+`Code scanning (CodeQL)` is the job in the workflow file, and this repository
+controls that name. The bare `CodeQL` comes from the upload into the
+code-scanning dashboard, and it
+follows the tool and the category in the uploaded result rather than anything
+written here, so it is not this repository's to keep stable. That is the same
+pair `docs/required-checks.md` already describes for the workflow auditor, and
+it matters for the same reason: a requirement pinned to the second name is
+pinned to somebody else's string.
+
 ## The query set
 
 `security-extended`.

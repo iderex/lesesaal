@@ -19,7 +19,8 @@ campaign definition if you still have it.
 
 How many answers a subject needed, and how those answers were turned into one
 label. If you did not change it, say that you used the default and give the
-version, because the default has changed between releases before.
+version, because the default belongs to the version you ran and a reader cannot
+look it up without knowing which version that was.
 
 ### Which subjects look wrong
 

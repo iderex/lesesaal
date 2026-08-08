@@ -13,3 +13,5 @@
 // There is no code in this package yet. #32 models the domain and #34 records
 // a classification.
 package campaign
+
+import _ "github.com/iderex/lesesaal/internal/web"

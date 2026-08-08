@@ -121,7 +121,7 @@ jobs:
           # commit it describes, or a reader has an inventory of an unknown
           # tree; the generator also warns when it has to guess.
           syft scan dir:. \
-            --select-catalogers 'go-module-file-cataloger' \
+            --select-catalogers '-github-actions-usage-cataloger' \
             --source-name lesesaal \
             --source-version "$HEAD_SHA" \
             -o spdx-json=sbom.spdx.json

@@ -219,13 +219,21 @@ and the assumed 5 answers are first exposed to people.
 
 ## What takes its numbers from here
 
-Three documents already point at this one rather than carrying a number of their
-own, which is the arrangement this document exists to complete:
+Five documents point at this one rather than carrying a number of their own,
+which is the arrangement this document exists to complete:
 
     git grep -c 'design point' -- docs/
-    docs/deployment-ceiling.md:2
-    docs/subject-media.md:1
-    docs/subject-selection.md:4
+    docs/deployment-ceiling.md:3
+    docs/design-point.md:6
+    docs/model-boundary.md:1
+    docs/retirement.md:1
+    docs/subject-media.md:2
+    docs/subject-selection.md:5
+
+Six lines, because the command counts this document's own uses of the phrase as
+well. That output was pasted here when three documents pointed at this one, and
+it is taken again rather than added to, so it is what the command produces at
+the commit that carries it.
 
 Where a later issue needs a size, it cites this document rather than restating a
 figure, and where it disagrees with one it changes the figure here instead of

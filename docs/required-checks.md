@@ -24,22 +24,42 @@ quoted rather than described.
 
     git grep -n '^  *name:' -- .github/workflows/
     .github/workflows/build.yml:47:    name: Build
+    .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
+    .github/workflows/dependency-lock.yml:73:    name: Dependency lock
     .github/workflows/doc-hygiene.yml:60:    name: Documentation formatting, paths and internal links
     .github/workflows/doc-hygiene.yml:249:    name: External links
+    .github/workflows/lint.yml:60:    name: Formatting, vet and lint
+    .github/workflows/sbom.yml:56:    name: Bill of materials
+    .github/workflows/sbom.yml:281:          name: sbom-spdx-json
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
     .github/workflows/scorecard.yml:85:          name: SARIF file
+    .github/workflows/test.yml:69:    name: Unit tests
     .github/workflows/text-hygiene.yml:31:    name: Line endings and encoding
     .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
+
+That output is longer than it was when this document was written, and it is
+pasted again rather than added to, because six checks landed between the two
+runs and a block that carried only the newest name would disagree with the
+command above it.
 
 One job deliberately carries no name, and its own comment says why:
 `.github/workflows/dependency-review.yml` leaves the job id to become the
 check-run name, which is `dependency-review`.
 
-The last line of that grep is not a check run at all. `SARIF file` is the name of
-an upload step inside the scorecard workflow, and it is listed here so that
-somebody comparing the grep against the list below does not go looking for it.
+Two lines of that grep are not check runs at all. `SARIF file` and
+`sbom-spdx-json` name upload steps, inside the scorecard workflow and the bill
+of materials workflow, and they are listed here so that somebody comparing the
+grep against the list below does not go looking for them.
+
+Four names in the grep are check runs and are not in the blocking list below:
+`Code scanning (CodeQL)`, `Dependency lock`, `Formatting, vet and lint` and
+`Bill of materials`. All four exist and all four report on a pull request. Each
+landed without being added here, which is what the last section of this document
+asks each change to do, so the omission is recorded rather than repaired in
+passing. Adding a name to the blocking list is an argument about what the branch
+should refuse, and that argument belongs to whoever makes it.
 
 ## The names as they actually appear on a pull request
 
@@ -62,9 +82,10 @@ on a push as well as on a pull request reports twice, and the repeated lines are
 cut rather than shown. Nothing else follows them.
 
 Every name in the blocking list below appears there and was green, so requiring
-them freezes nothing. `Build` is the exception and only because it did not exist
-when that output was taken: its verdict is recorded on the pull request that
-landed the build check, and it is quoted there rather than restated here.
+them freezes nothing. Two are exceptions and only because neither existed when
+that output was taken. `Build`'s verdict is recorded on the pull request that
+landed the build check, and `Unit tests`'s on the one that landed the unit test
+check, and both are quoted there rather than restated here.
 
 ## The blocking list, in the order to add it
 
@@ -75,6 +96,13 @@ declares and with dependency resolution switched off, so a change that does not
 compile, or that imports something the module file does not carry, cannot reach
 the default branch. It is first in the list because every later check is
 measured against a tree that builds.
+
+`Unit tests`. It runs the whole unit suite unprivileged and with no display, and
+it refuses a run that selected no test at all. That last leg is why it is second:
+without it the toolchain reports a package with no test file as a success, so a
+change that moves the suite where the job does not look leaves every later green
+meaning nothing. What it does not refuse is a socket opened at run time, and the
+workflow that produces this name says so at the top of the file.
 
 `DCO sign-off`. It is the only thing standing between an unsigned commit and the
 default branch, and this project cannot accept a contribution whose author never
@@ -136,14 +164,13 @@ leaves none.
 ## This request is repeated rather than made once
 
 The list is bounded by what exists at the moment it is asked for. `Build` was
-added to it by the change that landed the build check, which is what this
-section asks of every later one. The unit test check, the lint and format check,
-the bill of materials and the code scanning analysis are still to be written, in
-#20 through #25, and each adds its check-run name here in the change that lands
-it. The quality milestone is where the list is compared against the reference
+added to it by the change that landed the build check, and `Unit tests` by the
+change that landed the unit test check, which is what this section asks of every
+later one. Four checks that already exist did not, and the section above says
+which. The quality milestone is where the list is compared against the reference
 gate, which is #89's work rather than this document's.
 
-Until the ruleset carries the seven names above, #31 stays open. What closes it
+Until the ruleset carries the eight names above, #31 stays open. What closes it
 is the ruleset showing them, not this document existing.
 
 ## One thing found while writing this

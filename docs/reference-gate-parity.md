@@ -47,15 +47,18 @@ is not a required check but a step inside its build:
 What this repository runs, quoted from the workflows that produce the names:
 
     git grep -n '^    name:' -- .github/workflows/
-    .github/workflows/build.yml:47:    name: Build
+    .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
+    .github/workflows/build.yml:60:    name: Build
     .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
     .github/workflows/dependency-lock.yml:73:    name: Dependency lock
-    .github/workflows/doc-hygiene.yml:60:    name: Documentation formatting, paths and internal links
-    .github/workflows/doc-hygiene.yml:249:    name: External links
-    .github/workflows/lint.yml:60:    name: Formatting, vet and lint
+    .github/workflows/doc-hygiene.yml:74:    name: Documentation formatting, paths and internal links
+    .github/workflows/doc-hygiene.yml:263:    name: Documentation spelling
+    .github/workflows/doc-hygiene.yml:462:    name: External links
+    .github/workflows/lint.yml:67:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
+    .github/workflows/test.yml:80:    name: Unit tests
     .github/workflows/text-hygiene.yml:31:    name: Line endings and encoding
     .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
@@ -157,9 +160,16 @@ an external service, and `docs/required-checks.md` records that.
 
 `Repo Invariant Lint (Opengrep)`. Counted above as the greppable invariants.
 
-`Wiki Lint`. Adapt, #96. The reference's documentation lives in a wiki outside
-its tree, so linting it needs a separate route; here every document is tracked
-and the same leg that judges the source tree judges them.
+`Wiki Lint`. Adapt, #96, and it arrives as two check runs rather than one.
+The reference's documentation lives in a wiki outside its tree, so linting it
+needs a separate route; here every document is tracked and the same workflow
+that judges the source tree judges them. `Documentation formatting, paths and
+internal links` judges a document's shape, the paths it names and the links it
+carries. `Documentation spelling` judges its words, against a general word list
+and a project dictionary in `.github/dictionary.txt`. They are two names because
+a check run is matched by its literal name and a name listing three kinds of
+judgement would be wrong about a fourth. The reference has no counterpart to the
+second: its wiki lint does not read words.
 
 `Manifest freshness`. Drop. It asserts that a published plugin manifest lists
 the newest release per host generation, and this project publishes no manifest

@@ -1,0 +1,33 @@
+# This workflow exists to be refused by the workflow audit. It is never merged.
+#
+# The near miss is the mistake somebody actually makes when adding a workflow:
+# the action is referenced by its release tag rather than by a commit sha. A tag
+# is a moving pointer the action's owner can repoint at any time, so a workflow
+# pinned this way runs whatever that repository decides tomorrow, with this
+# repository's permissions.
+#
+# Everything else here is what the audit asks for, so the finding is the pin and
+# nothing else: the trigger is manual, the workflow-level permission set is
+# empty, the job grants only contents: read, and the checkout does not persist
+# the token.
+name: proof-unpinned
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  proof:
+    name: Refused by the workflow audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Do nothing
+        run: echo "this workflow is never run and never merged"

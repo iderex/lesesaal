@@ -18,23 +18,24 @@ remembered:
 
     git grep -n '^    name:' -- .github/workflows/
     .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
-    .github/workflows/build.yml:47:    name: Build
+    .github/workflows/build.yml:60:    name: Build
     .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
     .github/workflows/dependency-lock.yml:73:    name: Dependency lock
-    .github/workflows/doc-hygiene.yml:60:    name: Documentation formatting, paths and internal links
-    .github/workflows/doc-hygiene.yml:249:    name: External links
-    .github/workflows/lint.yml:60:    name: Formatting, vet and lint
+    .github/workflows/doc-hygiene.yml:74:    name: Documentation formatting, paths and internal links
+    .github/workflows/doc-hygiene.yml:263:    name: Documentation spelling
+    .github/workflows/doc-hygiene.yml:462:    name: External links
+    .github/workflows/lint.yml:67:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
-    .github/workflows/test.yml:69:    name: Unit tests
+    .github/workflows/test.yml:80:    name: Unit tests
     .github/workflows/text-hygiene.yml:31:    name: Line endings and encoding
     .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
 
-Fourteen names and one further check run. One job carries no name so that its
+Fifteen names and one further check run. One job carries no name so that its
 job id becomes the check-run name, which is `dependency-review`, and
-`docs/required-checks.md` is where that is explained. Fifteen entries follow,
+`docs/required-checks.md` is where that is explained. Sixteen entries follow,
 in that order.
 
 Every proof lives on a branch that is never merged. Where the check reports only
@@ -139,6 +140,37 @@ path that does not exist, and a link to a file that is not there.
 
 It prevents a document that reflows an unrelated paragraph on every edit, and a
 pointer to something renamed, which is how a plan quietly stops being a plan.
+
+## Documentation spelling
+
+The trip case is one letter dropped from one word, in prose, in a document
+nobody would look at twice: `deliberately` written `deliberatly` in
+`docs/harness.md`. It is the mistake a person actually makes rather than a
+string no speller could accept, and it is in a sentence rather than in a code
+span, because the leg strips code before it judges a word and a proof placed
+there would have proved the stripping instead.
+
+    https://github.com/iderex/lesesaal/actions/runs/31334351163/job/93297633867
+
+    FAIL  docs/harness.md:115 carries "deliberatly", which is in no dictionary this project carries
+    Examined 36282 word(s) of prose in 35 tracked document(s), against a project dictionary of 62 entry(s).
+
+Every other check on that commit was green, so the red verdict is this leg and
+nothing underneath it:
+
+    gh api repos/iderex/lesesaal/commits/94a1bd6/check-runs --jq '[.check_runs[] | select(.conclusion=="failure")] | length'
+    1
+
+It prevents a typo reaching an operator's guide, and it holds the terms
+`docs/vocabulary.md` fixes to one spelling wherever they appear, which is what
+stops a word this project decided on from arriving in three forms.
+
+The bound on it is in the workflow and belongs here too. It judges words rather
+than sentences, so a document can pass this leg and still be wrong: grammar,
+style and whether a sentence is true are none of its business. And what the
+project dictionary carries is curated rather than derived from
+`docs/vocabulary.md`, so a term that document fixes is spelled consistently only
+while somebody keeps the dictionary level with it.
 
 ## External links
 
@@ -316,9 +348,15 @@ proof taken for #21. Every check on that branch was green:
 That was correct at the time and is not any more. The rules are still guarded by
 a test rather than by a workflow leg, but a workflow now runs the tests:
 
-    git grep -n 'go test' -- .github/workflows/
-    .github/workflows/test.yml:146:          if ! listing=$(go test -mod=readonly -list '.*' ./...); then
-    .github/workflows/test.yml:180:          go test -mod=readonly -count=1 -failfast -v ./... 2>&1 | tee test-output.txt || status=$?
+    git grep -n 'go run \. ci' -- .github/workflows/test.yml
+    .github/workflows/test.yml:12:# `go run . ci <leg>`, which is the same procedure a contributor runs before
+    .github/workflows/test.yml:134:        run: go run . ci test-selection
+    .github/workflows/test.yml:138:        run: go run . ci test
+
+That command is not the one this paragraph was first written with. It quoted
+two `go test` lines out of the same workflow, and #150 replaced them with the
+one verb above, so the old command now matches nothing and a reader running it
+would have been left to guess whether the claim or the evidence had died.
 
 So the source guards that landed with the layout and the harness are executed by
 `Unit tests`, and the third trip case in that entry is one of them reddening a

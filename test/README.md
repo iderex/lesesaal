@@ -15,9 +15,14 @@ A unit test lives beside the code it judges, in the same package directory, as
 `layout_test.go` does at the module root. That is this toolchain's own
 convention and this directory is not an alternative to it.
 
-There is nothing here yet. The browser harness is #52, the end to end
+There is no harness here yet. The browser harness is #52, the end to end
 deployment harness is #80, and the fixtures each of them needs arrive with the
 harness rather than in a directory of their own.
+
+One thing that is not a harness lives here anyway. `test/gate-refusals.md`
+records what each check in this repository has been observed to refuse, with the
+run where it reddened, and it sits beside the harnesses because it is about
+whether the gate works rather than about whether the software does.
 
 This file is the placeholder `docs/layout.md` promises in every directory where
 code does not exist yet.

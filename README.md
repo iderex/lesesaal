@@ -26,3 +26,8 @@ See [NOTICE.md](NOTICE.md) for the intended-use notice, and
 [docs/scope-of-use.md](docs/scope-of-use.md) for what this is built for and the
 specific things it is not built for. Nothing in the software enforces that
 statement.
+
+[GOVERNANCE.md](GOVERNANCE.md) says who decides and what happens to a proposal
+nobody has time for. [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) says what is
+expected here and who receives a report. Both cover this repository and not a
+deployment somebody else runs.

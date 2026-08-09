@@ -26,13 +26,14 @@ remembered:
     .github/workflows/lint.yml:60:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
+    .github/workflows/test.yml:69:    name: Unit tests
     .github/workflows/text-hygiene.yml:31:    name: Line endings and encoding
     .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
 
-Twelve names and one further check run. One job carries no name so that its job
-id becomes the check-run name, which is `dependency-review`, and
-`docs/required-checks.md` is where that is explained. Thirteen entries follow,
+Thirteen names and one further check run. One job carries no name so that its
+job id becomes the check-run name, which is `dependency-review`, and
+`docs/required-checks.md` is where that is explained. Fourteen entries follow,
 in that order.
 
 Every proof lives on a branch that is never merged. Where the check reports only
@@ -164,6 +165,50 @@ is advisory in `docs/required-checks.md` for the same reason it cannot be
 proven, so nothing is gated on the gap, and it is the one entry in this record
 with no evidence behind it.
 
+## Unit tests
+
+Three trip cases, because this check has three legs and each refuses a different
+thing. All three are on one branch, one commit each, and every other check that
+ran on those three commits was green, so each red verdict is the leg under test
+and nothing underneath it.
+
+The first is a suite moved behind a build tag, which is what somebody writes
+when they mean to take a slow suite out of the ordinary run and then forgets to
+run it anywhere else. Every package still compiles and the toolchain reports a
+package with no test file as a success, so the check would have been green over
+nothing:
+
+    https://github.com/iderex/lesesaal/actions/runs/31296187043/job/93201545461
+
+The leg reported `Selected 0 test(s) across 7 package(s)` and failed there.
+
+The second is the core given an import of the surface, which the layout guard
+refuses. This is the leg that runs the suite, and the run summary carries the
+number rather than only the verdict: nineteen tests selected, seventeen
+executed, sixteen passed and one failed, the gap being the package that stopped
+at its first failing test.
+
+    https://github.com/iderex/lesesaal/actions/runs/31296264233/job/93201734635
+
+The third is a unit test that fetches a subject manifest over HTTP, which is
+what somebody writes when they want the ingest tested against a real manifest
+rather than a fixture. It compiles, it is formatted, and it skips itself when
+the host does not answer, so nothing at run time objects to it. What objects is
+`harness_test.go`, which reads the source and refuses a call into the standard
+library's HTTP client written outside `internal/system`, and it names the file,
+the line, the call and the field to take instead.
+
+    https://github.com/iderex/lesesaal/actions/runs/31296348917/job/93201936767
+
+It prevents a green tick over a suite that was never selected, a failing test
+reaching the default branch, and a unit test reaching the network.
+
+The third of those is bounded and the bound belongs here rather than only in the
+workflow. The refusal is over the call that is WRITTEN, so a connection opened
+through a helper this tree does not own, or by a dependency, is invisible to it,
+and the runner has a working network throughout. A suite that reaches the
+network without writing the call reaches it.
+
 ## Line endings and encoding
 
 The trip case is two files: one stored with CRLF, and one whose bytes are
@@ -222,7 +267,7 @@ Until that branch, this check had never read a manifest at all: the module on
 the default branch carries no requirement, so every green verdict it had
 produced was a verdict about nothing.
 
-## What is proven and has no check behind it
+## What was proven with no check behind it, and is not any more
 
 The deterministic harness rules have five near misses, one per rule, in the
 proof taken for #21. Every check on that branch was green:
@@ -230,15 +275,19 @@ proof taken for #21. Every check on that branch was green:
     gh api repos/iderex/lesesaal/commits/a4dab05/check-runs --jq '[.check_runs[] | select(.conclusion=="failure")] | length'
     0
 
-The rules are guarded by a test rather than by a workflow leg, and no workflow
-in this tree runs the tests:
+That was correct at the time and is not any more. The rules are still guarded by
+a test rather than by a workflow leg, but a workflow now runs the tests:
 
     git grep -n 'go test' -- .github/workflows/
+    .github/workflows/test.yml:146:          if ! listing=$(go test -mod=readonly -list '.*' ./...); then
+    .github/workflows/test.yml:180:          go test -mod=readonly -count=1 -failfast -v ./... 2>&1 | tee test-output.txt || status=$?
 
-That command prints nothing. So the guard is real, its near misses were
-observed to fail, and what observed them was somebody running the suite rather
-than a check. #20 is the check that closes that gap, and this record is where
-the gap is counted until it does.
+So the source guards that landed with the layout and the harness are executed by
+`Unit tests`, and the third trip case in that entry is one of them reddening a
+check rather than a terminal. What has not been re-taken is the five near misses
+themselves: they were observed by somebody running the suite, on a branch whose
+checks were all green because no check ran a test, and this record does not
+claim they have since been watched by one.
 
 ## Nothing refuses a check that arrives without an entry here
 

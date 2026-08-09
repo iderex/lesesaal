@@ -35,6 +35,7 @@ var layout = []part{
 	{dir: ".", mayImport: []string{
 		"internal/campaign",
 		"internal/campaign/campaigntest",
+		"internal/gate",
 		"internal/model",
 		"internal/store",
 		"internal/store/migration",
@@ -43,6 +44,7 @@ var layout = []part{
 	}},
 	{dir: "internal/campaign", mayImport: nil},
 	{dir: "internal/campaign/campaigntest", mayImport: []string{"internal/campaign"}},
+	{dir: "internal/gate", mayImport: nil},
 	{dir: "internal/model", mayImport: []string{"internal/campaign"}},
 	{dir: "internal/store", mayImport: []string{"internal/campaign"}},
 	{dir: "internal/store/migration", mayImport: []string{"internal/campaign"}},

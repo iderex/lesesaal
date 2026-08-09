@@ -7,6 +7,19 @@
 # literally, so renaming this job silently removes the requirement rather than
 # renaming it.
 #
+# The legs are not written here. Each step calls `go run . ci <leg>`, which is
+# the same procedure a contributor runs before pushing, so the tree holds one
+# gate and not two. The leg names are the contract between this file and
+# internal/gate, and a step naming a leg that does not exist is refused rather
+# than quietly running everything. #150 is where that was argued.
+#
+# WHAT CALLING THE COMMAND COSTS, and it is real. The toolchain compiles the
+# command before any leg of it runs, so a tree that does not compile fails at
+# `go run` with the compiler's message instead of inside the build leg. The
+# run is still red for the right reason and the message is still the
+# compiler's, but the leg that reports it is not the one whose name is on the
+# step.
+#
 # WHAT THIS DELIBERATELY DOES NOT DO, so a green run is not read as more than it
 # is:
 #
@@ -66,40 +79,15 @@ jobs:
           # dependency graph arrives and where this is revisited.
           cache: false
 
+      - name: Refuse a module whose dependencies are not what it claims
+        run: go run . ci mod-verify
+
       - name: Refuse a build that would resolve a dependency the module does not carry
-        run: |
-          set -euo pipefail
-          # -mod=readonly refuses to add or update a requirement to satisfy an
-          # import. A file importing something the module file does not list
-          # fails here rather than being silently resolved, which is the shape a
-          # stale lock file takes in this toolchain. The -deps is what makes
-          # this leg bite: without it the listing names the packages in the tree
-          # and never looks at what they import, so it passes a tree the build
-          # step then refuses. Measured, on the proof branch for this check.
-          #
-          # `go mod verify` checks that every downloaded module still matches
-          # its recorded hash. With an empty dependency set it verifies nothing
-          # and says so, and it is here so the leg exists before the first
-          # dependency does.
-          go mod verify
-          go list -mod=readonly -deps ./... > /dev/null
-          echo "Every import resolves with dependency resolution disabled."
+        # Always report, so a failure above cannot hide one here and send
+        # somebody round the loop twice.
+        if: ${{ !cancelled() }}
+        run: go run . ci deps
 
       - name: Build every package, and say how many were built
-        # Always report, so a failure above cannot hide a compile failure here
-        # and send somebody round the loop twice.
         if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          # A run that built nothing is not a run that built everything and
-          # found no error, so an empty package list fails closed.
-          packages=$(go list -mod=readonly ./...)
-          if [ -z "$packages" ]; then
-            echo "::error::No package was built. Failing closed rather than reporting a clean build."
-            exit 1
-          fi
-          count=$(printf '%s\n' "$packages" | wc -l)
-          printf '%s\n' "$packages"
-          echo "Building $count package(s) with the toolchain $(go version)."
-          go build -mod=readonly ./...
-          echo "Every package built."
+        run: go run . ci build

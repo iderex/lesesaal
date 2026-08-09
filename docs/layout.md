@@ -24,6 +24,7 @@ paragraph somebody remembers.
     +-- internal/
     |   +-- campaign/             the campaign core
     |   |   +-- campaigntest/     the fakes a test injects
+    |   +-- gate/                 the procedure that decides a change passes
     |   +-- model/                the model interface
     |   +-- store/                the storage layer
     |   |   +-- migration/        changes to the store's own shape
@@ -54,9 +55,18 @@ an operator runs would be a deployment whose time does not move.
 
 `internal/system/` holds the real values behind `campaign.Depends`, which are
 the wall clock, the random source, the identifier generator and the outbound
-dialler; it does not hold a rule, a handler or anything a test would want to
-stand in for, because it is the one directory permitted to read the runtime and
-everything in it is therefore unreachable from a deterministic suite.
+dialler, together with the two functions that start a program and look for one
+on the path; it does not hold a rule, a handler or anything a test would want
+to stand in for, because it is the one directory permitted to read the runtime
+and everything in it is therefore unreachable from a deterministic suite.
+Starting a process belongs here for the same reason reading the clock does:
+what it finds is whatever the machine happens to hold.
+
+`internal/gate/` holds the procedure that decides whether a change passes,
+which is the legs `ci` runs, the order they run in and what each one reports;
+it does not hold a subprocess, because it reaches the machine only through the
+two functions the entry point hands it, and its own suite decides what a
+command returned instead of running one.
 
 `internal/model/` holds the model interface, which is what a model is given
 when it scores a subject, what a proposal is and how a proposal is recorded,
@@ -108,6 +118,7 @@ inside this module.
     .                               every part below
     internal/campaign               nothing
     internal/campaign/campaigntest  internal/campaign
+    internal/gate                   nothing
     internal/model                  internal/campaign
     internal/store                  internal/campaign
     internal/store/migration        internal/campaign
@@ -202,10 +213,11 @@ a package comment in `internal/model/doc.go`, `internal/store/doc.go` and
 it. A placeholder is replaced by the first real thing that lands, not kept
 beside it.
 
-Three directories now hold code. `internal/campaign` holds the dependencies the
+Four directories now hold code. `internal/campaign` holds the dependencies the
 program takes rather than reads, `internal/system` holds the real values behind
-them, and `internal/campaign/campaigntest` holds the fakes. All three arrived
-with #21 and `harness.md` is where they are argued.
+them, and `internal/campaign/campaigntest` holds the fakes. Those three arrived
+with #21 and `harness.md` is where they are argued. `internal/gate` arrived with
+#150 and holds the gate the entry point runs as `ci`.
 
 Ingest, export and subject media have no directory here, and that is deliberate
 rather than an omission. Where each one goes is decided by the direction rule

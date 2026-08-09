@@ -386,19 +386,32 @@ jobs:
           # line. Running the speller once over everything concatenated is
           # cheaper and produces a list of words with nowhere to go and look.
           printf '%s\n' "$files" | while IFS= read -r src; do
-            # Prose only. A fenced or indented block is a command or a
-            # transcript, an inline code span is an identifier, and a link
-            # target is a URL or a path; none of the three is a sentence and all
-            # three would otherwise be judged as words.
-            awk '
+            # Prose only, and what that means is five removals rather than one,
+            # each because the thing removed is not a sentence:
+            #
+            #   A fenced or indented block is a command or a transcript.
+            #   An inline code span is an identifier.
+            #   A token carrying a slash, or a dot with a letter after it, is a
+            #     path, a URL or a filename. That covers a link target and it
+            #     covers a bare one written in the middle of a sentence.
+            #   A token carrying a digit is a version, a hash or an issue
+            #     reference. `#68` is not a misspelling of anything.
+            #   A possessive is grammar rather than spelling. If `commit` is a
+            #     word then so is `commit's`, and whether a noun may take one is
+            #     the judgement this leg says at the job that it does not make.
+            #
+            # The apostrophe arrives as a variable because the program below is
+            # inside a single-quoted shell word and cannot carry one directly.
+            awk -v q="'" '
               FNR == 1 { infence = 0 }
               /^```/ { infence = !infence; next }
               {
                 if (infence || $0 ~ /^    /) next
                 line = $0
                 gsub(/`[^`]*`/, " ", line)
-                gsub(/\]\([^)]*\)/, "] ", line)
-                gsub(/https?:\/\/[^ )]*/, " ", line)
+                gsub(/[^ \t]*(\/|\.[A-Za-z])[^ \t]*/, " ", line)
+                gsub(q "s", " ", line)
+                gsub(/[A-Za-z]*[0-9][A-Za-z0-9]*/, " ", line)
                 print line
               }' "$src" > prose.txt
             printf '%s ' "$(wc -w < prose.txt)" >> counts.txt
@@ -410,8 +423,10 @@ jobs:
               [ -n "$word" ] || continue
               # Back to the document for the line, so the report points at the
               # place to fix rather than at a word. The first occurrence is
-              # enough: a term spelled wrong throughout is one repair.
-              where=$(grep -n -m1 -F -- "$word" "$src" | cut -d: -f1 || true)
+              # enough: a term spelled wrong throughout is one repair. The match
+              # is on a whole word, because a substring search sends the reader
+              # to the first line carrying those letters inside another word.
+              where=$(grep -n -m1 -w -F -- "$word" "$src" | cut -d: -f1 || true)
               if [ -n "$where" ]; then
                 echo "FAIL  $src:$where carries \"$word\", which is in no dictionary this project carries"
               else

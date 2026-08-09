@@ -8,6 +8,17 @@
 # literally, so renaming this job silently removes the requirement rather than
 # renaming it.
 #
+# The two legs that judge the suite are not written here. Each calls
+# `go run . ci <leg>`, which is the same procedure a contributor runs before
+# pushing, so the tree holds one gate and not two. #150 is where that was
+# argued.
+#
+# THE FIRST LEG IS NOT ONE OF THEM AND STAYS SHELL. It judges the job rather
+# than the tree: whether this run is root and whether a display is reachable
+# are facts about the machine the run landed on, and `ci` reads the repository.
+# A leg that answered differently on a contributor's laptop from on a runner
+# would be a leg nobody could act on.
+#
 # A test that needs a display, a browser, an accelerator, a container runtime or
 # a real network is not a unit test in this project. It belongs in one of the
 # harnesses under test/, which have their own entry points and their own names,
@@ -120,116 +131,8 @@ jobs:
 
       - name: Refuse a run that would select no test
         if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          # THIS IS THE LEG THAT MAKES EVERY LATER GREEN MEAN SOMETHING. The
-          # toolchain reports a package with no test file as a success, so a
-          # change that moves the whole suite somewhere this job does not look
-          # leaves the check green and the suite unrun. The selection is counted
-          # before anything is executed, and zero fails.
-          #
-          # -list takes a regular expression and prints the names it would
-          # select without running any of them. The package lines it also prints
-          # are dropped: a test name is what is being counted.
-          packages=$(go list -mod=readonly ./...)
-          if [ -z "$packages" ]; then
-            echo "::error::No package was examined. Failing closed rather than reporting a suite that selected nothing."
-            exit 1
-          fi
-          #
-          # The listing is captured with an explicit guard rather than piped
-          # straight into a counter. A pipeline whose failure is swallowed by
-          # `|| true` yields the count zero, and this leg would then report a
-          # suite that selects nothing when what actually happened is that the
-          # toolchain could not answer. Those are different failures and only
-          # one of them names the repair.
-          if ! listing=$(go test -mod=readonly -list '.*' ./...); then
-            echo "::error::The toolchain could not list the tests. Failing closed rather than reading that as a suite of zero."
-            exit 1
-          fi
-          names=$(printf '%s\n' "$listing" | grep -E '^(Test|Example|Fuzz)' || true)
-          if [ -z "$names" ]; then
-            selected=0
-          else
-            selected=$(printf '%s\n' "$names" | wc -l)
-          fi
-          echo "--- the names this job would select ---"
-          printf '%s\n' "$names"
-          echo "Selected $selected test(s) across $(printf '%s\n' "$packages" | wc -l) package(s)."
-          if [ "$selected" -eq 0 ]; then
-            echo "::error::The suite selected no test at all. A run that selected nothing is not a run that passed; failing closed."
-            exit 1
-          fi
-          echo "The suite selects $selected test(s)."
+        run: go run . ci test-selection
 
       - name: Run the unit suite, and say how many tests ran
         if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          # -count=1 defeats the result cache, so a green here is a run rather
-          # than a memory of one. -failfast stops the package at the first
-          # failing test, which is what the issue asks for: the first failure is
-          # the one somebody repairs, and the ones after it are frequently
-          # consequences of it.
-          #
-          # The transcript is kept so the count below is derived from what
-          # actually ran rather than asserted. pipefail is what makes the
-          # toolchain's verdict survive the pipe into tee.
-          set -o pipefail
-          status=0
-          go test -mod=readonly -count=1 -failfast -v ./... 2>&1 | tee test-output.txt || status=$?
-          # A COUNT THAT IS NOT A NUMBER IS NOT A COUNT OF ZERO. If the
-          # transcript is missing, grep fails, `|| true` leaves the count empty,
-          # and `[ "" -eq 0 ]` reports an error rather than a verdict. A non-zero
-          # status inside an `if` is a false condition and not an error, so
-          # set -e never fires and the leg passes over nothing. The transcript is
-          # checked before anything is counted and every count is checked to be a
-          # number before it is compared. This shape is the bill of materials
-          # workflow's, where the failure was found.
-          if [ ! -s test-output.txt ]; then
-            echo "::error::There is no transcript to count. Failing closed rather than reporting a suite that ran."
-            exit 1
-          fi
-          require_number() {
-            case "$2" in
-              ''|*[!0-9]*)
-                echo "::error::$1 came out as '$2', which is not a count. Failing closed rather than comparing it."
-                exit 1
-                ;;
-            esac
-          }
-          # A top-level verdict is at column zero; a subtest's is indented. This
-          # counts tests rather than assertions, which is the number the issue
-          # asks to be visible.
-          ran=$(grep -cE '^--- (PASS|FAIL|SKIP): ' test-output.txt || true)
-          passed=$(grep -cE '^--- PASS: ' test-output.txt || true)
-          failed=$(grep -cE '^--- FAIL: ' test-output.txt || true)
-          skipped=$(grep -cE '^--- SKIP: ' test-output.txt || true)
-          require_number "the number of tests executed" "$ran"
-          require_number "the number that passed" "$passed"
-          require_number "the number that failed" "$failed"
-          require_number "the number that were skipped" "$skipped"
-          {
-            echo "### Unit tests"
-            echo
-            echo "| tests executed | passed | failed | skipped |"
-            echo "| --- | --- | --- | --- |"
-            echo "| $ran | $passed | $failed | $skipped |"
-            echo
-            echo "Toolchain: \`$(go version)\`. Run with \`-count=1 -failfast\`, so a"
-            echo "green verdict is a run rather than a cached one, and a package stops at"
-            echo "its first failing test."
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "Executed $ran test(s): $passed passed, $failed failed, $skipped skipped."
-          if [ "$status" -ne 0 ]; then
-            echo "::error::The unit suite failed. The first failing test is the one to repair; -failfast stopped its package there."
-            exit "$status"
-          fi
-          # The leg above counted the selection before anything ran. If nothing
-          # ran anyway, the toolchain reported success over an empty suite and
-          # that is not a pass.
-          if [ "$ran" -eq 0 ]; then
-            echo "::error::The suite reported success and executed no test. Failing closed."
-            exit 1
-          fi
-          echo "Every selected test ran and none failed."
+        run: go run . ci test

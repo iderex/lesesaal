@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/iderex/lesesaal/internal/gate"
 	"github.com/iderex/lesesaal/internal/system"
 )
 
@@ -31,6 +32,21 @@ import (
 var version = "0.0.0-dev"
 
 func main() {
+	// The gate before anything else, because it takes none of the wiring
+	// below and a contributor running it on a half-built tree should get the
+	// gate's verdict rather than a complaint about a dependency.
+	//
+	// `ci` with no leg named runs the whole set in order and stops at the
+	// first failure. `ci <leg>` runs one and requires it, which is the form a
+	// workflow step calls so that one red leg cannot hide the next.
+	if len(os.Args) > 1 && os.Args[1] == "ci" {
+		leg := ""
+		if len(os.Args) > 2 {
+			leg = os.Args[2]
+		}
+		os.Exit(gate.Run(os.Stdout, gate.Env{Run: system.Run, Look: system.Look}, leg))
+	}
+
 	// A nil field is a dependency nobody supplied. A program that starts on one
 	// panics at the first call rather than at startup, which is the wrong end
 	// of a run to find out, so this refuses to start instead.

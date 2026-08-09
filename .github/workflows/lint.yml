@@ -9,6 +9,13 @@
 # check-run names literally, so renaming this job silently removes the
 # requirement rather than renaming it.
 #
+# The legs are not written here. Each step calls `go run . ci <leg>`, which is
+# the same procedure a contributor runs before pushing, so the tree holds one
+# gate and not two. #150 is where that was argued. Installing the linter is
+# still a step of this file rather than a leg of the command: the leg reports
+# that it could not run rather than putting a program on somebody's machine,
+# and on a runner the machine is thrown away afterwards.
+#
 # Every leg says what it examined and fails closed on an empty selection. A run
 # that judged nothing and a run that judged everything and found nothing print
 # the same word otherwise, and only one of them is worth a green tick. Every leg
@@ -79,77 +86,30 @@ jobs:
           cache: false
 
       - name: Refuse a Go file the formatter would change
-        run: |
-          set -euo pipefail
-          # gofmt ships with the toolchain, so this leg costs no tool and no
-          # version to keep current. The file list comes from git rather than
-          # from a directory walk: what is being judged is what the repository
-          # stores, and a build directory or an editor backup left in the
-          # checkout is neither.
-          files=$(git ls-files '*.go')
-          if [ -z "$files" ]; then
-            echo "::error::No tracked Go file was examined. Failing closed rather than reporting a formatted tree."
-            exit 1
-          fi
-          count=$(printf '%s\n' "$files" | wc -l)
-          # -l lists the files that differ from their formatted form. It is
-          # silent and exits 0 on a clean tree, so the list rather than the
-          # exit code is what decides this leg.
-          bad=$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 gofmt -l)
-          echo "Examined $count tracked Go file(s) with the gofmt from $(go version)."
-          if [ -n "$bad" ]; then
-            printf '%s\n' "$bad" | sed 's/^/FAIL  /'
-            echo "--- what the formatter would change ---"
-            printf '%s\n' "$bad" | tr '\n' '\0' | xargs -0 gofmt -d
-            echo "::error::Go file(s) above are not in the form gofmt produces. Run 'gofmt -w' over them."
-            exit 1
-          fi
-          echo "Every tracked Go file is already in the form gofmt produces."
+        run: go run . ci gofmt
 
       - name: Refuse a finding from the toolchain's own correctness analyser
         # Always report, so a formatting failure above cannot hide an analyser
         # finding here.
         if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          # -mod=readonly for the same reason the build check uses it: a file
-          # importing something go.mod does not list fails here rather than
-          # being silently resolved.
-          packages=$(go list -mod=readonly ./...)
-          if [ -z "$packages" ]; then
-            echo "::error::No package was analysed. Failing closed rather than reporting a clean tree."
-            exit 1
-          fi
-          count=$(printf '%s\n' "$packages" | wc -l)
-          printf '%s\n' "$packages"
-          echo "Analysing $count package(s) with go vet from $(go version)."
-          go vet -mod=readonly ./...
-          echo "go vet reports nothing on every package."
+        run: go run . ci vet
+
+      - name: Install the linter this project pinned
+        if: ${{ !cancelled() }}
+        # Installed by pinned version rather than by an action, and installed as
+        # a program rather than as a requirement of this module: 'go install
+        # pkg@version' resolves outside the main module, so go.mod and the empty
+        # dependency set the build check guards are untouched. The module
+        # proxy's checksum database is what makes the pin mean a fixed set of
+        # bytes. GOFLAGS is cleared for this one command because -mod=readonly
+        # is a statement about this module and this command is not about this
+        # module.
+        #
+        # Installing is a step and not a leg. The leg below refuses to run
+        # rather than to install, because putting a program on somebody's
+        # machine is a decision the gate does not take for them.
+        run: GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
 
       - name: Refuse a finding from the linter set this project chose
         if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          # Installed by pinned version rather than by an action, and installed
-          # as a program rather than as a requirement of this module: 'go
-          # install pkg@version' resolves outside the main module, so go.mod and
-          # the empty dependency set the build check guards are untouched. The
-          # module proxy's checksum database is what makes the pin mean a fixed
-          # set of bytes. GOFLAGS is cleared for this one command because
-          # -mod=readonly is a statement about this module and this command is
-          # not about this module.
-          GOFLAGS= go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
-          packages=$(go list -mod=readonly ./...)
-          if [ -z "$packages" ]; then
-            echo "::error::No package was linted. Failing closed rather than reporting a clean tree."
-            exit 1
-          fi
-          count=$(printf '%s\n' "$packages" | wc -l)
-          # The enabled set is staticcheck.conf's, read from the module root, so
-          # this command and a contributor's bare 'staticcheck ./...' judge the
-          # same checks. No -checks flag is passed here on purpose.
-          available=$(staticcheck -list-checks | wc -l)
-          printf '%s\n' "$packages"
-          echo "Linting $count package(s) with $(staticcheck -version), $available check(s) available and the enabled set fixed by staticcheck.conf."
-          staticcheck ./...
-          echo "The linter reports nothing on every package."
+        run: go run . ci staticcheck

@@ -29,38 +29,33 @@ manager:
 
 ## Running the gate before you push
 
-There is no single command that runs the gate. This section is a list instead,
-and that is a defect rather than a design: every leg lives as shell inside a
-workflow file, so the only thing that runs all of them is the server. Issue
-#150 is where the one command is owed.
+One command, and it is a verb of the program rather than a script beside it:
 
-What runs from a clean clone, in the order the server runs it:
+    go run . ci
 
-    go mod verify
-    go list -mod=readonly -deps ./... > /dev/null
-    go build -mod=readonly ./...
-    gofmt -l $(git ls-files '*.go')
-    go vet -mod=readonly ./...
-    staticcheck ./...
-    go test ./...
+The legs run in the order a reader wants them and the run stops at the first
+failure, because the second finding is usually the first one again. Every leg
+says what it examined, so a run that covered less than the whole set cannot be
+read as one that covered it and found nothing.
 
-`-mod=readonly` is not decoration. It refuses to add a requirement in order to
-satisfy an import, so a file importing something the module file does not carry
-fails on your machine the way it fails on the server instead of being resolved
-quietly. `gofmt -l` prints the files it would change and prints nothing on a
-clean tree, so the list rather than the exit status is its verdict. The enabled
-linter set is `staticcheck.conf`, read from the module root, so the bare
-command above and the server judge the same checks.
+The workflow steps call the same command by leg name, `go run . ci gofmt` and
+so on, so the tree holds one procedure and not two. What the legs are is
+printed by the command and is not listed here: a list in this document drifts
+against the thing that decides it.
 
-Four legs have no local form today, and this list does not pretend otherwise.
-The line ending and encoding checks and the document checks are awk and git
-plumbing written inside their workflow files. The workflow audit needs a
-separate runner. The bill of materials needs a generator binary. Those four are
-what #150 has to reach.
+The run ends by saying what it did not do and why, which is the part worth
+reading. Some of the gate is still shell inside a workflow file, some of it
+needs a tool this tree does not carry, and some of it is server-side by
+nature. All three are named in the report rather than left out of it.
 
-Two more are server-side by nature and stay there: the dependency review reads
-an advisory database, and the scorecard analysis scores against an external
-service.
+The command does not install the linter the section above pins, and on a clone
+without it the linter leg reports that it did not run and says that install
+line back to you. A leg that did not run is not a leg that passed, and the
+summary counts the three states apart rather than two.
+
+Naming a leg requires it. `go run . ci staticcheck` on a machine without the
+linter fails rather than reporting a disclosure, because asking for a leg by
+name is what makes its absence the answer to a question somebody asked.
 
 ## No work without an issue
 

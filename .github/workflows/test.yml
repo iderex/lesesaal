@@ -56,7 +56,7 @@
 #   milestone own those, and a coverage number reported here would be read as a
 #   quality gate this check is not.
 #
-#   It does not run the harnesses under test/. There are none yet; #52 and #80
+#   It does not run the harnesses under test/. There are none yet; #51 and #80
 #   build them, each with its own check-run name so a run that skipped one says
 #   so.
 name: test
@@ -121,7 +121,7 @@ jobs:
             fail=1
           fi
           if [ -n "${DISPLAY:-}" ]; then
-            echo "::error::A display is available to this job. The unit suite runs with none; a test that needs one belongs in the browser harness, which is #52."
+            echo "::error::A display is available to this job. The unit suite runs with none; a test that needs one belongs in the browser harness, which is #51."
             fail=1
           fi
           if [ "$fail" -ne 0 ]; then

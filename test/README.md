@@ -15,7 +15,7 @@ A unit test lives beside the code it judges, in the same package directory, as
 `layout_test.go` does at the module root. That is this toolchain's own
 convention and this directory is not an alternative to it.
 
-There is no harness here yet. The browser harness is #52, the end to end
+There is no harness here yet. The browser harness is #51, the end to end
 deployment harness is #80, and the fixtures each of them needs arrive with the
 harness rather than in a directory of their own.
 

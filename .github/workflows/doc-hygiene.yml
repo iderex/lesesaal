@@ -3,9 +3,14 @@
 # renamed is how a plan quietly stops being a plan. This is the check that
 # refuses the machine-decidable half of that.
 #
-# Three legs run on every branch and every pull request, because all three are
-# deterministic and depend on nothing outside this repository. A fourth leg,
+# Four legs run on every branch and every pull request, because all four are
+# deterministic and depend on nothing outside this repository. A fifth leg,
 # external links, runs on a schedule instead, and the reason is at that job.
+#
+# Three of the four judge a document's shape and the fourth judges its words.
+# The spelling leg is the one that came last, because it needs a project
+# dictionary and the dictionary has to hold the terms from `docs/vocabulary.md`,
+# which #5 owed and has since landed.
 #
 # WHAT THIS DELIBERATELY DOES NOT CHECK, so a green run is not read as more than
 # it is:
@@ -16,10 +21,13 @@
 #   Whether a document is TRUE. A guide can pass every leg here and describe
 #   software that does something else. That is what a review is for.
 #
-#   Spelling. It needs a project dictionary, and the dictionary is supposed to
-#   hold the terms from the vocabulary document, which does not exist yet: #5
-#   owes it. A dictionary assembled before it would fix the spelling of words
-#   the project has not agreed on. #96 stays open on this leg.
+#   Whether the dictionary holds every term `docs/vocabulary.md` fixes. The
+#   dictionary is curated and no leg derives the term list from that document.
+#   Deriving it means matching the shape of an English definition sentence, and
+#   a definition rewritten into another shape would drop its term from the
+#   requirement with nothing saying so, which is a check that fails open. What
+#   the dictionary carries today is a decision recorded in #96 rather than
+#   something a run establishes.
 #
 #   Heading anchors. A link to `docs/foo.md#some-heading` is checked as far as
 #   `docs/foo.md` and the fragment is ignored, so a renamed heading is not
@@ -244,6 +252,190 @@ jobs:
             exit 1
           fi
           echo "Every internal link resolves."
+
+  spelling:
+    name: Documentation spelling
+    # The fourth thing #96 asks for, and the last one it stayed open on. The
+    # other three legs judge a document's shape; this one judges its words, so
+    # that the terms `docs/vocabulary.md` fixes are spelled one way wherever
+    # they appear, and so that a typo in an operator's guide is caught by the
+    # gate rather than by the operator.
+    #
+    # It is a job of its own rather than a fourth step beside the others,
+    # because a check-run name is what a ruleset matches and the name of the job
+    # above says what that job judges. Adding a fourth kind of judgement under a
+    # name listing three would make the name wrong.
+    #
+    # WHAT THIS DELIBERATELY DOES NOT DO:
+    #
+    #   It does not judge grammar, style or whether a sentence is true. Those
+    #   are the same judgements the job above disclaims and for the same reason.
+    #
+    #   It does not read anything that is not a tracked `*.md` file, and inside
+    #   one it reads prose only. Fenced and indented code blocks, inline code
+    #   spans and link targets are removed before a word is judged, because a
+    #   pasted command is not prose and a dictionary that had to carry every
+    #   identifier in it would stop being a dictionary.
+    #
+    #   It does not say WHERE in a line the word is, only which line first
+    #   carries it. A word is reported once per document at its first
+    #   occurrence, because a term spelled wrong throughout would otherwise
+    #   produce one report per sentence.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Refuse a project dictionary that cannot be read as a list
+        run: |
+          set -euo pipefail
+          # The dictionary is a plain word list, one word per line, because that
+          # is the format the speller below reads. The format carries no comment
+          # syntax, so nothing in the file can say why a word is in it, and the
+          # only defence a file like that has against becoming a junk drawer is
+          # that it stays sorted, unique and free of anything that is not a word.
+          # That is what this step refuses, and it runs before the speller so a
+          # malformed dictionary is reported as a malformed dictionary rather
+          # than as a document full of unknown words.
+          dict=.github/dictionary.txt
+          if [ ! -s "$dict" ]; then
+            echo "::error::$dict is missing or empty. Failing closed rather than judging every word against the general word list alone."
+            exit 1
+          fi
+
+          fail=0
+          if grep -n '^[[:space:]]*$' "$dict" > /dev/null; then
+            grep -n '^[[:space:]]*$' "$dict" | while IFS=: read -r n _; do
+              echo "FAIL  $dict:$n is blank"
+            done
+            fail=1
+          fi
+          if grep -n '[[:space:]]' "$dict" > /dev/null; then
+            grep -n '[[:space:]]' "$dict" | while IFS=: read -r n rest; do
+              echo "FAIL  $dict:$n carries whitespace: $rest"
+            done
+            fail=1
+          fi
+          # LC_ALL=C so the order is the byte order and not the runner's locale.
+          # A dictionary sorted under one collation and checked under another
+          # would red for a reason nobody changed.
+          if ! LC_ALL=C sort -c -u "$dict" 2> sortcheck.txt; then
+            sed 's/^/FAIL  /' sortcheck.txt
+            echo "FAIL  $dict is not sorted, or carries the same word twice"
+            fail=1
+          fi
+
+          entries=$(grep -c '' "$dict")
+          echo "Examined $entries entry(s) in $dict."
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::The project dictionary above is not a sorted list of one word per line. Sort it with LC_ALL=C sort -u and remove anything that is not a word."
+            exit 1
+          fi
+          echo "The project dictionary reads as a sorted list of $entries word(s)."
+
+      - name: Refuse a word that is in no dictionary this project carries
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          # The word list is British English, because that is what this tree
+          # writes: `normalised` and `summarised` are in it today and a check
+          # spelling them wrong would be a check nobody could pass.
+          #
+          # WHAT PINS THIS IS THE RUNNER IMAGE AND NOT A VERSION, and that is
+          # this leg's cost rather than a detail. The other tools in this gate
+          # are pinned, a Go tool by its version and an action by its commit, and
+          # no such pin exists for a system word list. A runner image that ships
+          # a different one can move this verdict without anything in this tree
+          # changing. The version it actually used is printed below so a red run
+          # can be told from a moved word list, and #99 is where the pinning
+          # position for the whole gate is argued.
+          #
+          # That unpinned word list is also why the project dictionary carries
+          # the terms from `docs/vocabulary.md` whether or not the general list
+          # already knows them. A term this project fixes the meaning of should
+          # not have its verdict decided by somebody else's package, and a word
+          # the general list knows today it can stop knowing tomorrow.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq hunspell hunspell-en-gb
+          echo "speller  $(hunspell -vv | head -n 1)"
+          echo "wordlist $(dpkg-query -W -f='${Package} ${Version}' hunspell-en-gb)"
+
+          files=$(git ls-files '*.md')
+          if [ -z "$files" ]; then
+            echo "::error::No tracked document was examined. Failing closed rather than reporting a clean tree."
+            exit 1
+          fi
+          if [ ! -s .github/dictionary.txt ]; then
+            echo "::error::.github/dictionary.txt is missing or empty. Failing closed rather than judging every word against the general word list alone."
+            exit 1
+          fi
+
+          # Both files are created empty rather than appended into existence, so
+          # a run where the loop never executed is told apart from one where it
+          # found nothing, and neither reads a file that is not there.
+          : > counts.txt
+          : > failures.txt
+
+          # One document at a time, so the report can name the document and the
+          # line. Running the speller once over everything concatenated is
+          # cheaper and produces a list of words with nowhere to go and look.
+          printf '%s\n' "$files" | while IFS= read -r src; do
+            # Prose only. A fenced or indented block is a command or a
+            # transcript, an inline code span is an identifier, and a link
+            # target is a URL or a path; none of the three is a sentence and all
+            # three would otherwise be judged as words.
+            awk '
+              FNR == 1 { infence = 0 }
+              /^```/ { infence = !infence; next }
+              {
+                if (infence || $0 ~ /^    /) next
+                line = $0
+                gsub(/`[^`]*`/, " ", line)
+                gsub(/\]\([^)]*\)/, "] ", line)
+                gsub(/https?:\/\/[^ )]*/, " ", line)
+                print line
+              }' "$src" > prose.txt
+            printf '%s ' "$(wc -w < prose.txt)" >> counts.txt
+
+            # -l prints one unknown word per line and nothing else, so what
+            # comes back is words rather than lines of a report.
+            hunspell -d en_GB -p .github/dictionary.txt -l prose.txt | sort -u > unknown.txt
+            while IFS= read -r word; do
+              [ -n "$word" ] || continue
+              # Back to the document for the line, so the report points at the
+              # place to fix rather than at a word. The first occurrence is
+              # enough: a term spelled wrong throughout is one repair.
+              where=$(grep -n -m1 -F -- "$word" "$src" | cut -d: -f1 || true)
+              if [ -n "$where" ]; then
+                echo "FAIL  $src:$where carries \"$word\", which is in no dictionary this project carries"
+              else
+                echo "FAIL  $src carries \"$word\", which is in no dictionary this project carries"
+              fi
+              echo x >> failures.txt
+            done < unknown.txt
+          done
+
+          # The loop above runs in a subshell, so its counters do not survive it
+          # and the files it appended to are what does.
+          words=$(awk '{ for (i = 1; i <= NF; i++) total += $i } END { print total + 0 }' counts.txt)
+          examined=$(printf '%s\n' "$files" | wc -l)
+          entries=$(grep -c '' .github/dictionary.txt)
+          echo "Examined $words word(s) of prose in $examined tracked document(s), against a project dictionary of $entries entry(s)."
+          if [ "$words" -eq 0 ]; then
+            echo "::error::No prose was extracted from the tracked documents. Failing closed rather than reporting a clean sweep of nothing."
+            exit 1
+          fi
+          if [ -s failures.txt ]; then
+            echo "::error::Word(s) above are in neither the general word list nor .github/dictionary.txt. Fix the spelling, or add the word to the dictionary if this project means it."
+            exit 1
+          fi
+          echo "Every word of prose is in a dictionary this project carries."
 
   external-links:
     name: External links

@@ -94,9 +94,11 @@ minute with no model at all.
 
 ## What it costs per request, and how that grows
 
-At the readme's figures, around two thousand subjects, the eligible set is small
-enough to hold in memory in its entirety, and a draw is an index lookup and a
-random choice.
+At the design point, 2,000 subjects, the eligible set is small enough to hold in
+memory in its entirety, and a draw is an index lookup and a random choice.
+`design-point.md` says so in the same words when it names the 4 GB it assumes,
+and it names selection among the things deliberately left slow: a campaign that
+runs for weeks does not need a subject chosen in under a millisecond.
 
 Growth is the part worth stating. The eligible set is defined by three
 conditions. Not retired and not held are properties of the subject, so an index
@@ -108,12 +110,21 @@ design point it is the first thing to give, and the repair, which is not built
 today, is to keep the exclusion as a per volunteer structure rather than as a
 join.
 
+Stated against the design point, the numbers are these. Ten volunteers ask for a
+subject at up to 30 draws a minute at the busiest moment, each volunteer carries
+at most a few hundred exclusions by the end of a campaign of 2,000 subjects, and
+the whole request a volunteer waits on has a budget of 300 milliseconds on the
+assumed host, which `design-point.md` sets and which this draw is one part of.
+At a hundred times the design point `design-point.md` names subject selection as
+the second thing to give, after the serialised write path, and for the reason in
+the paragraph above.
+
 All of this is a claim. Nothing has been measured, because the selection is not
-written and neither is the store. There is no design point document either: #3
-holds it and the figures used above are the readme's rather than a decided
-number. The measurement that would settle the paragraph is the time to serve one
-subject at the design point and at ten times it, taken on the assumed host, and
-it becomes possible with #35.
+written and neither is the store, and the 300 milliseconds is a target that
+document sets rather than anything this project has observed. The measurement
+that would settle the paragraph is the time to serve one subject at the design
+point and at ten times it, taken on the assumed host, and it becomes possible
+with #35.
 
 What is deliberately not optimised: a campaign that runs for weeks does not need
 a subject selected in under a millisecond, and nothing here should be made faster

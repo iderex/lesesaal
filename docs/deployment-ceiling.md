@@ -89,19 +89,26 @@ answer is written where the change is argued.
 An embedded store serialises writes. That is the ceiling the shape buys, and it
 is the number a later argument about a separate database has to beat.
 
-The figures this project is built for are the ones in the readme, around two
-thousand subjects and around ten volunteers on one machine. Against those, a
-classification is one short write, and ten volunteers answering as fast as a
-person can look at a plate produce something under two writes a second.
+The figures to compare it against are `design-point.md`'s rather than this
+document's. At the design point the busiest moment is ten volunteers classifying
+at once, which is 30 classifications a minute, one every two seconds. A
+classification is one short write, so the serialised write path is asked for one
+write every two seconds at the peak this project is built for.
 
-That comparison is a claim and not a measurement. Nothing has been run, because
-there is no code to run: the store is not chosen, the schema does not exist, and
-the write is not written. What the claim rests on is arithmetic over the readme's
-figures and an assumption about how fast a person classifies, and both belong to
-the design point, which is issue #3 and is not yet written down.
+At ten times the design point that is 5 a second, and `design-point.md` says in
+its own words that the write rate is not what gives there: disk does, and after
+it ingest. At a hundred times it is 50 a second competing with the reads that
+pick the next subject, and there the serialised write path is the first thing
+to give. So the ceiling this shape buys sits between ten and a hundred times the
+size this project is built for, which is the comparison the choice owed.
 
-So the honest statement is this. The ceiling is unmeasured. The first measurement
-that would settle it is the classification write rate a single embedded store
-sustains on the assumed host, and it becomes possible once #33 exists. Until
-then, a proposal to add a database is answering question 2 above against nothing,
-and so is a claim that one is not needed.
+None of that is measured. Nothing has been run, because there is no code to run:
+the store is not chosen, the schema does not exist, and the write is not written.
+Both documents are arithmetic over assumptions, and `design-point.md` says which
+of its numbers are assumed and which are derived from something assumed.
+
+So the honest statement is this. The ceiling is compared and unmeasured. The
+first measurement that would settle it is the classification write rate a single
+embedded store sustains on the assumed host, which needs the store in #33 and
+the write path in #35. Until then, a proposal to add a database is answering
+question 2 above against arithmetic, and so is a claim that one is not needed.

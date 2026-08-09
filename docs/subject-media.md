@@ -89,16 +89,25 @@ version of this that makes somebody on a phone wait.
 The disk cost of the choice is the doubling: the operator's original stays where
 it was and this project holds its own copy, plus the derived sizes.
 
-At the readme's figures, around two thousand plate images, that is the original
-collection's size again plus the derived set. Neither number is measured here.
-Nothing has been ingested, no derived size has been chosen, and this project has
-no plate images to weigh. The design point that would carry a per subject size is
-issue #3 and is not written.
+`design-point.md` is where the per subject size now comes from, so the cost has
+a figure instead of a shape. It assumes 50 MB for a plate as the operator hands
+it over and 1.5 MB for the derived sizes kept beside it, and at 2,000 subjects
+that is about 103 GB: 100 GB of owned copies and 3 GB derived. The operator's
+original collection is another 100 GB and sits outside that figure, on the
+operator's own disk, which is what the doubling above costs.
 
-So the statement is that the storage cost is roughly twice the collection plus
-the derived sizes, as arithmetic rather than as a measurement, and the number
-that would replace it is a real ingest of a real collection with the disk usage
-recorded, which is possible with #64 and belongs to the pilot in #116.
+That is also the number `design-point.md` calls the one most likely to be wrong,
+because the size of a digitised plate varies widely between archives, and it is
+what makes disk the resource this project consumes: at the design point the
+campaign's own data is under 100 MB against 103 GB of media.
+
+Nothing here is measured. Nothing has been ingested, no derived size has been
+chosen, which is #67, and this project has no plate images to weigh. So the
+statement is that the storage cost is about 103 GB at the design point plus the
+operator's own copy, as arithmetic over an assumed per subject size rather than
+as a measurement, and the number that would replace it is a real ingest of a real
+collection with the disk usage recorded, which is possible with #64 and belongs
+to the pilot in #116.
 
 ## What takes its scope from here
 

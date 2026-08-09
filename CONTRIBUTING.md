@@ -172,6 +172,7 @@ lands after this paragraph was last touched will be in them and not in it. Run
 the command rather than trusting the paste:
 
     git grep -n '^    name:' -- .github/workflows/
+    .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
     .github/workflows/build.yml:47:    name: Build
     .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
@@ -181,6 +182,7 @@ the command rather than trusting the paste:
     .github/workflows/lint.yml:60:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
+    .github/workflows/test.yml:69:    name: Unit tests
     .github/workflows/text-hygiene.yml:31:    name: Line endings and encoding
     .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
@@ -188,7 +190,12 @@ the command rather than trusting the paste:
 One job deliberately carries no name so that its check run takes the job id
 instead, which is `dependency-review`, and its own comment says why.
 
-What each one refuses, in the order above. `Build` compiles every package with
+What each one refuses, in the order above. `Sweep the default branch for a
+non-success run` is the one that judges no change of yours: it runs daily, asks
+which runs on the default branch concluded something other than success, and
+files what it finds as an issue on this tracker, because two of the checks
+below never report on a pull request and can stay red where nobody looks.
+`Build` compiles every package with
 dependency resolution switched off. `Code scanning (CodeQL)` reads the Go source
 for a security defect and reds on any finding, which `docs/code-scanning.md`
 argues. `DCO sign-off` is the section above. `Dependency lock` refuses a module
@@ -202,7 +209,9 @@ vet and lint` is the formatter, the toolchain's correctness analyser and the
 linter, in that order. `Bill of materials` produces the inventory of what is in
 here and refuses one that has stopped covering an ecosystem the tree carries.
 `Scorecard analysis` scores supply chain hygiene and reports to the security
-dashboard. `Line endings and encoding` refuses a tracked text file that is not
+dashboard. `Unit tests` runs the suite on a stock runner with no display and no
+elevation, and fails a run that selected no test at all.
+`Line endings and encoding` refuses a tracked text file that is not
 stored with LF or does not decode as UTF-8. `Reject Trojan Source Unicode`
 refuses bidirectional and invisible control characters, which exist to make a
 file read differently from how it behaves. `Audit workflows (zizmor)` audits

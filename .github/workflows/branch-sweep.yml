@@ -1,0 +1,200 @@
+# The default branch sweep (#159). Every other check here reports on a pull
+# request, and a pull request is watched. Nothing watches the default branch
+# afterwards, so a workflow that runs on a schedule, or on a push to `main` and
+# not on a pull request, can conclude non-success and leave no trace anybody
+# meets. Two in this tree are in exactly that position, the weekly external
+# link leg and the scorecard analysis, and docs/required-checks.md records why
+# neither can be a required check: a check that never reports on a pull request
+# cannot guard one, so the only thing that can catch it is a sweep afterwards.
+#
+# COVERAGE IS A PROPERTY RATHER THAN A LIST. The sweep asks the run list which
+# runs on the branch concluded something other than success, so a workflow
+# added to this repository is watched the day it lands and there is nothing to
+# register anywhere. Outside these comments this file names no workflow at all.
+#
+# WHERE THE REPORT GOES. An issue on this repository's own tracker, under a
+# label of its own and assigned, and docs/reference-gate-parity.md carries the
+# same sentence. It is not the run's own conclusion, and that is the whole design.
+# A failing run on the default branch is the thing this file exists to notice,
+# so reporting by failing would make the report exactly as invisible as what it
+# reports on. It is not an email either: a run that is not a required
+# pull-request check does not notify the way a failed push does, which is the
+# observation the reference implementation of this element states in its own
+# header.
+#
+# So this job exits zero when it finds a red run and has filed it, and it exits
+# non-zero only when it could not judge. That inversion is what lets the sweep
+# examine its own runs like any other. A sweep that fails closed is itself a
+# non-success run on the default branch, and the next sweep reports it in the
+# issue rather than passing over it, which a self-excluding sweep could not do.
+#
+# WHAT IT CANNOT SEE, so a green run is not read as more than it is. It reads
+# the run list rather than the runs, so a workflow that concluded success while
+# doing nothing is invisible to it, and that is what every other check's own
+# fail-closed leg is for. The window is the previous sweep, so a sweep that
+# never ran at all advances nothing and a sweep lost to an outage leaves a gap
+# no later run closes; the fallback window below bounds the first case and not
+# the second. It sweeps one branch, the default one unless told otherwise, and
+# a red run on a release branch is nobody's here today.
+#
+# Uses the gh CLI that the runner image already carries and the token the run
+# is given. No action is used, so there is nothing to pin.
+name: branch-sweep
+
+on:
+  schedule:
+    # Daily. The two workflows this exists for run weekly, so a day is well
+    # inside the interval at which either could red twice unnoticed, and the
+    # cost of the tick is one API listing.
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "The branch to sweep. Empty means this repository's default branch."
+        required: false
+        type: string
+      since:
+        description: "Sweep runs updated at or after this instant, as YYYY-MM-DDTHH:MM:SSZ. Empty means since the previous sweep."
+        required: false
+        type: string
+
+# Deny everything at the workflow level; the job takes the two grants it needs
+# and nothing else.
+permissions: {}
+
+# Never two sweeps at once, and never cancel one mid-flight: a cancelled sweep
+# may have filed half its report, and the window would still have moved past
+# what it did not file.
+concurrency:
+  group: branch-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: Sweep the default branch for a non-success run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # Read the run list, and file or update the one tracking issue. No
+      # contents, so this job cannot write to the tree, and nothing that would
+      # let it re-run or cancel anything.
+      actions: read
+      issues: write
+
+    steps:
+      - name: Sweep the branch and file what concluded non-success
+        # Every value reaching the shell arrives through the environment. None
+        # is spliced into the script as an expression, which is what the
+        # workflow audit refuses and what an input that carries a quotation
+        # mark would otherwise turn into.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BRANCH_INPUT: ${{ inputs.branch }}
+          SINCE_INPUT: ${{ inputs.since }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW_FILE: branch-sweep.yml
+          # What the first sweep looks back over, and what a sweep looks back
+          # over when no earlier run of this workflow can be found. Stated here
+          # rather than derived, because there is nothing to derive it from at
+          # the moment it is needed.
+          FALLBACK_HOURS: "24"
+          # A label of its own rather than one the tracker already uses. The
+          # label is how a second sweep finds the issue a first one filed, so a
+          # label shared with planned work would put a comment on somebody
+          # else's issue the first time the two collided.
+          LABEL: branch-sweep
+          ASSIGNEE: iderex
+        run: |
+          set -euo pipefail
+
+          branch="${BRANCH_INPUT:-$DEFAULT_BRANCH}"
+
+          # The window. "Since the previous sweep" is read literally: the
+          # newest earlier run of this same workflow, whatever it concluded. A
+          # sweep that fails still moves the window, and the header says so.
+          since="${SINCE_INPUT:-}"
+          window="the instant given on the dispatch"
+          if [ -z "$since" ]; then
+            since=$(gh run list --repo "$REPO" --workflow "$WORKFLOW_FILE" \
+              --limit 20 --json databaseId,createdAt \
+              | jq -r --argjson self "$RUN_ID" \
+                '[.[] | select(.databaseId != $self) | .createdAt] | sort | last // empty')
+            window="the previous sweep"
+          fi
+          if [ -z "$since" ]; then
+            since=$(date -u -d "-${FALLBACK_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
+            window="the stated fallback of ${FALLBACK_HOURS} hours, because no earlier sweep was found"
+          fi
+
+          gh run list --repo "$REPO" --branch "$branch" --limit 100 \
+            --json workflowName,conclusion,url,event,updatedAt > runs.json
+          examined=$(jq length runs.json)
+
+          # Fail closed. A branch whose run list is empty is a branch this
+          # sweep did not judge, and a sweep that judged nothing and a sweep
+          # that judged everything and found nothing print the same word
+          # otherwise.
+          if [ "$examined" -eq 0 ]; then
+            echo "::error::No workflow run on ${branch} was examined, so nothing was judged. Failing closed rather than reporting a clean branch."
+            exit 1
+          fi
+
+          # A denylist rather than an allowlist, so a conclusion class nobody
+          # has met yet is reported rather than silently dropped. `success` and
+          # `skipped` are no-ops, `cancelled` is somebody's deliberate act, and
+          # an empty conclusion is a run that has not finished.
+          jq -r --arg since "$since" '
+            .[]
+            | select(.updatedAt >= $since)
+            | select((.conclusion // "") as $c
+                     | $c != "success" and $c != "skipped" and $c != "cancelled" and $c != "")
+            | [.url, .conclusion, .event, .workflowName] | @tsv
+          ' runs.json > red.tsv
+
+          red=$(wc -l < red.tsv)
+          echo "Examined ${examined} run(s) on ${branch} against ${window}, at or after ${since}. ${red} concluded non-success."
+          {
+            echo "Examined ${examined} run(s) on \`${branch}\` at or after ${since}, which is ${window}."
+            echo
+            echo "${red} concluded non-success."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$red" -eq 0 ]; then
+            echo "Nothing on ${branch} concluded non-success in that window."
+            exit 0
+          fi
+
+          body="A workflow run on \`${branch}\` in this repository concluded something other than success, in the window ending now and starting at ${since}, which is ${window}.
+
+          A run on the default branch is not a required pull-request check and nothing reports it where a pull request is reported, so it can stay red while every pull request shows green. What is red:
+          "
+          while IFS=$'\t' read -r url conclusion event wf; do
+            body="${body}
+          - **${wf}** concluded \`${conclusion}\` on \`${event}\`: ${url}"
+          done < red.tsv
+          body="${body}
+
+          Fix the cause and run it green on \`${branch}\`, then close this issue. A later sweep does not reopen it: the window moves past what has been reported.
+
+          Filed by the sweep in \`.github/workflows/branch-sweep.yml\`, which #159 asked for."
+
+          # Provision the label rather than assume it. The first fire is the
+          # create path, and a sweep that died on a label somebody deleted
+          # would be a report nobody gets for the reason nobody would guess.
+          gh label create "$LABEL" --repo "$REPO" --color b60205 --force \
+            --description "Filed by the default branch sweep, #159" >/dev/null
+
+          number=$(gh issue list --repo "$REPO" --state open --label "$LABEL" \
+            --json number --jq '.[0].number // empty')
+
+          if [ -n "${number:-}" ]; then
+            echo "Commenting on the open alert issue #${number}."
+            gh issue comment "$number" --repo "$REPO" --body "$body"
+          else
+            echo "No open alert issue; filing one."
+            gh issue create --repo "$REPO" --label "$LABEL" --assignee "$ASSIGNEE" \
+              --title "A workflow concluded non-success on the default branch" \
+              --body "$body"
+          fi

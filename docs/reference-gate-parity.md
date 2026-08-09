@@ -173,10 +173,21 @@ tag, #120 for signatures and #123 for the first release. The per-generation
 channels drop with the manifest: there are no host generations to publish
 against.
 
-`Publish failure alert`. Adapt, #159. Nothing in this plan swept the default
-branch for a workflow that concluded non-success, and writing this document is
-where that was found, so the issue was opened for it rather than the element
-recorded as unplaced.
+`Publish failure alert`. Adapted, in `.github/workflows/branch-sweep.yml`,
+delivered by #159. Nothing in this plan swept the default branch for a workflow
+that concluded non-success, and writing this document is where that was found,
+so the issue was opened for it rather than the element recorded as unplaced.
+
+Two things about it are this repository's rather than the reference's. The
+report goes to an issue on this tracker under a label of its own, assigned,
+and that is where a reader should expect to meet a red default branch; it is
+not the sweep's own verdict, because a failing run on the default branch is
+the thing the sweep exists to notice and reporting by failing would make the
+report exactly as invisible as what it reports on. And the sweep fails closed
+on a branch whose run list is empty, which the reference does not do, so a
+sweep that judged nothing cannot be read as a clean branch. Those two together
+let the sweep examine its own runs like any other, which a self-excluding
+sweep cannot.
 
 ## What this repository has that the reference does not
 
@@ -206,7 +217,9 @@ randomness, identifiers and outbound connections are taken as dependencies and
 supplied in one place, and a departure is a failing test rather than a review
 comment.
 
-The layout test in `layout_test.go`, delivered by #18 and widened by #97.
+The layout test in `layout_test.go`, delivered by #18. What #97 widened was
+`harness_test.go` beside it, which now refuses a subprocess as well, and
+`test/architecture-rules.md` lists both guards with every rule each one holds.
 Which part of the tree may know about which other part is a verdict here. The
 reference states its equivalent as a conformance test over one directory; this
 one is over the dependency direction of the whole tree.

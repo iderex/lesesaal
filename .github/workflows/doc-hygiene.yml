@@ -29,6 +29,12 @@
 #   the dictionary carries today is a decision recorded in #96 rather than
 #   something a run establishes.
 #
+#   Whether a hyphenated coinage is a word. The speller judges `un-retires` as
+#   `un` and `retires`, so the half that is not a word on its own is what a
+#   run reports, and the dictionary carries `un` for that reason. An entry
+#   like that admits the bare fragment everywhere in the tree, which is the
+#   price of judging the compound at all with a speller that does not know it.
+#
 #   Heading anchors. A link to `docs/foo.md#some-heading` is checked as far as
 #   `docs/foo.md` and the fragment is ignored, so a renamed heading is not
 #   caught. Adding it means deriving GitHub's own anchor slugs, which is a

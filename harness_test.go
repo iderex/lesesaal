@@ -94,13 +94,21 @@ var refused = []read{
 	{path: "net/http", name: "PostForm", instead: "the Dial field of campaign.Depends"},
 	{path: "net/http", name: "DefaultClient", instead: "the Dial field of campaign.Depends"},
 	{path: "net/http", name: "DefaultTransport", instead: "the Dial field of campaign.Depends"},
+
+	// A subprocess. This is in the table for a different reason from the reads
+	// above it: it asks nothing of the clock and opens no socket. It is one of
+	// the three things docs/layout.md says the unit suite may not have, and it
+	// was the only one of the three that nothing here refused. A test that
+	// shells out is a test of the machine it ran on, and a process started
+	// outside the wiring reaches whatever that machine happens to hold.
+	{path: "os/exec", instead: "the thing the command would have done, written in this language"},
 }
 
 // TestOnlyTheWiringReadsTheRuntime is the one that earns the file. It refuses a
 // direct read of the clock, of a random source or of a socket anywhere but the
-// wiring package, and it names the file, the line, the call and what to use
-// instead, so the failure says which rule was broken rather than only that one
-// was.
+// wiring package, and a subprocess started anywhere but there, and it names the
+// file, the line, the call and what to use instead, so the failure says which
+// rule was broken rather than only that one was.
 func TestOnlyTheWiringReadsTheRuntime(t *testing.T) {
 	files := 0
 	selectors := 0
@@ -142,7 +150,7 @@ func TestOnlyTheWiringReadsTheRuntime(t *testing.T) {
 						where = "in a test"
 					}
 				}
-				t.Errorf("%s:%d calls %s.%s, which reads the runtime and is refused %s. Take %s instead.",
+				t.Errorf("%s:%d calls %s.%s, which reaches the runtime and is refused %s. Take %s instead.",
 					file, fset.Position(selector.Pos()).Line, qualifier.Name, selector.Sel.Name, where, rule.instead)
 			}
 			return true

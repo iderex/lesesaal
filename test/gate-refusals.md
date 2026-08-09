@@ -42,24 +42,40 @@ on a pull request, the branch was opened as one, observed, and closed unmerged.
 
 ## Sweep the default branch for a non-success run
 
-No demonstrated refusal at the commit this entry landed on, and the entry is
-here rather than omitted because of it.
+Two runs, because this check has two verdicts and they are opposite states.
+Both were taken on the default branch rather than on a branch, which is the
+only place this check runs at all, so neither could be taken before it merged.
 
-The sweep runs on a schedule and on request and never on a pull request, so no
-branch can be made to red it the way most entries below were. Its trip case has
-to be taken on the default branch, which means after it is merged rather than
-before, and what it needs is a run of the sweep against a branch whose run list
-is empty: that is the fail-closed leg, and a sweep that judged nothing must not
-report a clean branch.
+The trip case for the fail-closed leg is a branch name that does not exist,
+which is what a dispatch with a typed branch produces. The run list came back
+empty, and an empty run list is a branch this sweep did not judge rather than a
+branch with nothing wrong:
 
-Two things are worth separating in that trip case, and both are #159's last two
-conditions. The fail-closed leg reddening, and the next sweep picking that red
-run up and filing it, which is the sweep examining its own runs like every
-other workflow's.
+    https://github.com/iderex/lesesaal/actions/runs/31303480771/job/93219943491
 
-This entry is filled in by the change that takes those runs. Until then the
-sweep is one of two checks here whose behaviour on a bad branch is not known,
-and the other is `Scorecard analysis` below.
+    No workflow run on no-such-branch-here was examined, so nothing was judged. Failing closed rather than reporting a clean branch.
+
+The second is the sweep meeting that failure. The run above is a real
+non-success run on the default branch, produced by this check and not excluded
+from what it examines, and the next sweep picked it up and filed it:
+
+    https://github.com/iderex/lesesaal/actions/runs/31303515962/job/93220032635
+
+That sweep concluded success, which is the design rather than a leniency. The
+report is the issue it filed and not the run's own verdict, because a red
+default branch reported by reddening a run on the default branch would be as
+invisible as the thing it reports on. What the issue carried was the workflow
+name, the conclusion, the trigger and the link to the failed run, under a label
+of its own and assigned.
+
+It prevents a workflow concluding non-success on the default branch and nobody
+meeting it, which is the position the weekly external link leg and the
+scorecard analysis are both in, and it prevents a sweep that examined nothing
+being read as a clean branch.
+
+What has not been shown is the schedule. Both runs above were dispatched by
+hand, so the daily trigger has fired nothing here yet, and a cron that never
+fires would leave every verdict above true and the check useless.
 
 ## Build
 

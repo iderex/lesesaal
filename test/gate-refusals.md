@@ -17,6 +17,7 @@ The checks are what the workflows declare, and the list is derived rather than
 remembered:
 
     git grep -n '^    name:' -- .github/workflows/
+    .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
     .github/workflows/build.yml:47:    name: Build
     .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
@@ -31,13 +32,34 @@ remembered:
     .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
 
-Thirteen names and one further check run. One job carries no name so that its
+Fourteen names and one further check run. One job carries no name so that its
 job id becomes the check-run name, which is `dependency-review`, and
-`docs/required-checks.md` is where that is explained. Fourteen entries follow,
+`docs/required-checks.md` is where that is explained. Fifteen entries follow,
 in that order.
 
 Every proof lives on a branch that is never merged. Where the check reports only
 on a pull request, the branch was opened as one, observed, and closed unmerged.
+
+## Sweep the default branch for a non-success run
+
+No demonstrated refusal at the commit this entry landed on, and the entry is
+here rather than omitted because of it.
+
+The sweep runs on a schedule and on request and never on a pull request, so no
+branch can be made to red it the way most entries below were. Its trip case has
+to be taken on the default branch, which means after it is merged rather than
+before, and what it needs is a run of the sweep against a branch whose run list
+is empty: that is the fail-closed leg, and a sweep that judged nothing must not
+report a clean branch.
+
+Two things are worth separating in that trip case, and both are #159's last two
+conditions. The fail-closed leg reddening, and the next sweep picking that red
+run up and filing it, which is the sweep examining its own runs like every
+other workflow's.
+
+This entry is filled in by the change that takes those runs. Until then the
+sweep is one of two checks here whose behaviour on a bad branch is not known,
+and the other is `Scorecard analysis` below.
 
 ## Build
 

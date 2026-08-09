@@ -23,6 +23,7 @@ A required check is matched by its literal check-run name, so the list has to be
 quoted rather than described.
 
     git grep -n '^  *name:' -- .github/workflows/
+    .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
     .github/workflows/build.yml:47:    name: Build
     .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
@@ -147,6 +148,15 @@ code scanning upload rather than from the job, and its name follows the tool and
 the category in the uploaded results rather than anything written in the
 workflow file. Requiring `Audit workflows (zizmor)` pins the same finding set to
 a name this repository controls.
+
+`Sweep the default branch for a non-success run`. It runs on a schedule and on
+request and never on a pull request, so it is advisory for the same reason
+`External links` is. It is also the one check here whose subject is the other
+checks: it exists because the two above never report on a pull request and can
+therefore stay red on the default branch unmet, which is what
+`.github/workflows/branch-sweep.yml` sets out. Its own report is an issue on
+this tracker rather than its verdict, so a red sweep and a sweep that filed
+something are different states and neither is a thing to gate a merge on.
 
 ## No bypass actor is wanted
 

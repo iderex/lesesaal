@@ -46,10 +46,10 @@ toolchain's own parser, so it needs no subprocess, no network and no dependency.
 
 It refuses three things.
 
-A direct read of the runtime anywhere but the wiring package. The table it
-judges against is in that file, and it names the injected field to take instead,
-so a failure says which rule was broken rather than only that one was. What is
-in it, by the package it reaches:
+A reach into the runtime anywhere but the wiring package. The table it judges
+against is in that file, and it names the injected field to take instead, so a
+failure says which rule was broken rather than only that one was. What is in it,
+by the package it reaches:
 
     time             the reads that ask the clock for the moment
     math/rand        every identifier
@@ -57,9 +57,18 @@ in it, by the package it reaches:
     crypto/rand      every identifier
     net              the dialling and the listening calls
     net/http         the calls that go out through a package-level client
+    os/exec          every identifier
 
 Type names are not in it, so a signature naming an instant or a connection is
 untouched.
+
+The last row is in that set for a different reason from the rest, and it
+arrived later, with #97. Starting a process asks nothing of the clock and opens
+no socket. It is one of the three things `docs/layout.md` says the unit suite
+may not have, alongside the network and a dependency, and it was the only one
+of the three that nothing in this tree refused. A test that shells out is a
+test of the machine it ran on, and a process started outside the wiring reaches
+whatever that machine happens to hold.
 
 A sleep, in every file in the tree, including the wiring and including a test.
 In a test a sleep is a statement that the author could not express what they

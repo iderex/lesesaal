@@ -50,9 +50,11 @@
 #   It does not run tests. #20 owns the unit test check, with its own
 #   requirements about display, elevation and network.
 #
-#   It does not judge whether a suppression is justified. staticcheck.conf says
-#   a suppression carries its check identifier and a reason; nothing here reads
-#   the reason, and the quality milestone is where that becomes a check.
+#   It does not judge whether a suppression is justified. The fourth leg
+#   refuses a suppression that names no check identifier or gives no reason at
+#   all, which is the shape staticcheck.conf asks for; whether the reason it
+#   gives is a good one is a judgement nothing here makes and the review is
+#   where a bad one is caught.
 name: lint
 
 on:

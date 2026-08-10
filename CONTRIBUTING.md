@@ -175,7 +175,7 @@ the command rather than trusting the paste:
     .github/workflows/doc-hygiene.yml:81:    name: Documentation formatting, paths and internal links
     .github/workflows/doc-hygiene.yml:118:    name: Documentation spelling
     .github/workflows/doc-hygiene.yml:317:    name: External links
-    .github/workflows/lint.yml:74:    name: Formatting, vet and lint
+    .github/workflows/lint.yml:76:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
     .github/workflows/test.yml:80:    name: Unit tests

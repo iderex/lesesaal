@@ -219,6 +219,13 @@ them, and `internal/campaign/campaigntest` holds the fakes. Those three arrived
 with #21 and `harness.md` is where they are argued. `internal/gate` arrived with
 #150 and holds the gate the entry point runs as `ci`.
 
+`internal/campaign` also holds the campaign definition boundary, which is the
+first of the core's own rules to land and arrived with #32. It is the shape a
+written definition becomes and the refusal of one outside the grammar
+`task-grammar.md` fixes, and it reaches nothing: the boundary judges a value it
+was handed, so the property at the top of this document is what makes its suite
+a suite of the rule rather than of a store.
+
 Ingest, export and subject media have no directory here, and that is deliberate
 rather than an omission. Where each one goes is decided by the direction rule
 above at the moment the issue that needs it starts, and inventing a home for it

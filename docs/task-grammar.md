@@ -150,9 +150,14 @@ collection it is about.
 A definition that names a type outside the grammar is refused before the campaign
 starts, with a message that names the offending task and lists the supported set,
 so that a campaign owner learns what is available from the refusal rather than
-from reading source. That refusal does not exist yet and this document does not
-claim it does. It is owed by #32, which builds the definition boundary, and the
-test that proves it belongs there.
+from reading source. That refusal is `campaign.Define` in
+`internal/campaign/definition.go`, and the tests that watch it refuse each of
+the four shapes above are beside it.
+
+It reports every refusal a definition earns rather than the first, which is a
+choice about the campaign owner rather than about the grammar: a person learning
+what is available one refusal per run gets there having read the same message
+several times.
 
 ## Anything that is not an image
 

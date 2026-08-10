@@ -5,11 +5,15 @@
 # so the declaration and the check are two different things and only the second
 # one bites.
 #
-# Both legs read the index rather than the working tree, because a checkout
-# filter can hide the very byte the leg is about. Each leg says how many files it
-# examined, so a run that covered nothing cannot be read as a run that covered
-# everything and found nothing. Both legs always report: the second carries
-# if !cancelled() so a failure in the first does not hide a second failure.
+# The legs are not written here. Each step calls `go run . ci <leg>`, which is
+# the same procedure a contributor runs before pushing, so the tree holds one
+# gate and not two. What each leg reads, and why the line ending is read from
+# the index rather than from the checkout, is at the leg in internal/gate.
+#
+# Each leg says how many files it examined, so a run that covered nothing cannot
+# be read as a run that covered everything and found nothing. Both legs always
+# report: the second carries if !cancelled() so a failure in the first does not
+# hide a second failure.
 name: text-hygiene
 
 on:
@@ -18,7 +22,7 @@ on:
   pull_request:
     branches: ["**"]
 
-# Read-only: both legs only read git.
+# Read-only: both legs only read the checkout and git.
 permissions:
   contents: read
 
@@ -39,70 +43,22 @@ jobs:
           # No step pushes, so do not persist the GITHUB_TOKEN in .git/config.
           persist-credentials: false
 
+      - name: Install the toolchain the module declares
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # Read the version from go.mod rather than repeating it here, so the
+          # module file stays the one place the toolchain version is declared.
+          go-version-file: go.mod
+          # The dependency set is empty, so there is nothing to cache and a
+          # cache step would only add a restore that can fail. #23 is where the
+          # dependency graph arrives and where this is revisited.
+          cache: false
+
       - name: Refuse a tracked text file that is not stored with LF
-        run: |
-          set -euo pipefail
-          # `git ls-files --eol` reports the line ending of the blob in the index
-          # in its first field: i/lf, i/crlf, i/mixed, i/none for a file with no
-          # line ending at all, and i/-text for a file git treats as binary. The
-          # blob is what a fresh clone on any platform receives, which is the
-          # thing being declared.
-          tracked=$(git ls-files | wc -l)
-          examined=$(git ls-files --eol | awk '$1 != "i/-text"' | wc -l)
-          echo "Examined $examined tracked text file(s) of $tracked tracked file(s)."
-          if [ "$tracked" -eq 0 ]; then
-            echo "::error::No tracked file was examined. Failing closed rather than reporting a clean tree."
-            exit 1
-          fi
-          bad=$(git ls-files --eol | awk '$1 == "i/crlf" || $1 == "i/mixed"')
-          if [ -n "$bad" ]; then
-            echo "$bad"
-            echo "::error::Tracked text file(s) above are stored with CRLF or with mixed line endings. This tree is stored with LF; see .gitattributes. Re-add them with 'git add --renormalize .'"
-            exit 1
-          fi
-          echo "Every tracked text file is stored with LF."
+        run: go run . ci line-endings
 
       - name: Refuse a tracked text file that is not UTF-8
         # Always report, so a line-ending failure above cannot hide an encoding
         # failure here and send somebody round the loop twice.
         if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          # The declared encoding is UTF-8. `git grep -I --cached -l -e ''` lists
-          # every tracked file git does not treat as binary, read from the index.
-          # core.quotePath=false keeps a non-ASCII path readable as itself rather
-          # than as escapes.
-          #
-          # git grep exits 0 when it matched, 1 when it did not, and 2 or more on
-          # a scanner error. The `|| rc=$?` keeps set -e from aborting on the
-          # empty case, and both the error case and the empty case fail: a leg
-          # that examined nothing is not a leg that found nothing.
-          rc=0
-          files=$(git -c core.quotePath=false grep -I --cached -l -e '' -- .) || rc=$?
-          if [ "$rc" -gt 1 ]; then
-            echo "::error::Could not list tracked text files (git grep exit $rc). Failing closed rather than assuming the tree is clean."
-            exit 1
-          fi
-          if [ -z "$files" ]; then
-            echo "::error::No tracked text file was examined. Failing closed rather than reporting a clean tree."
-            exit 1
-          fi
-          count=0
-          bad=0
-          while IFS= read -r f; do
-            count=$((count + 1))
-            # The blob from the index, not the file on disk, for the same reason
-            # as the leg above. iconv from UTF-8 to UTF-8 succeeds only if every
-            # byte decodes as UTF-8; ASCII is a subset and passes.
-            if git cat-file blob ":$f" | iconv -f UTF-8 -t UTF-8 > /dev/null 2>&1; then
-              continue
-            fi
-            echo "FAIL  $f does not decode as UTF-8"
-            bad=1
-          done <<< "$files"
-          echo "Examined $count tracked text file(s) for UTF-8 validity."
-          if [ "$bad" -ne 0 ]; then
-            echo "::error::Tracked text file(s) above are not UTF-8. This tree is UTF-8; convert the file rather than adding an exception."
-            exit 1
-          fi
-          echo "Every tracked text file decodes as UTF-8."
+        run: go run . ci encoding

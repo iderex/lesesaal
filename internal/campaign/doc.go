@@ -10,6 +10,9 @@
 // Where the core needs something from outside itself, it declares the
 // interface here and main.go supplies the implementation.
 //
-// There is no code in this package yet. #32 models the domain and #34 records
-// a classification.
+// What is here so far is the dependencies the program takes rather than reads,
+// and the campaign definition boundary: the types a campaign owner's written
+// definition becomes, and the refusal of one that asks something this project
+// does not support. The rest of #32 is the subject, the classification, the
+// answer and the label, and #34 records one.
 package campaign

@@ -24,26 +24,29 @@ quoted rather than described.
 
     git grep -n '^  *name:' -- .github/workflows/
     .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
-    .github/workflows/build.yml:47:    name: Build
+    .github/workflows/build.yml:60:    name: Build
     .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
     .github/workflows/dependency-lock.yml:73:    name: Dependency lock
-    .github/workflows/doc-hygiene.yml:60:    name: Documentation formatting, paths and internal links
-    .github/workflows/doc-hygiene.yml:249:    name: External links
-    .github/workflows/lint.yml:60:    name: Formatting, vet and lint
+    .github/workflows/doc-hygiene.yml:81:    name: Documentation formatting, paths and internal links
+    .github/workflows/doc-hygiene.yml:118:    name: Documentation spelling
+    .github/workflows/doc-hygiene.yml:317:    name: External links
+    .github/workflows/lint.yml:67:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/sbom.yml:281:          name: sbom-spdx-json
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
     .github/workflows/scorecard.yml:85:          name: SARIF file
-    .github/workflows/test.yml:69:    name: Unit tests
-    .github/workflows/text-hygiene.yml:31:    name: Line endings and encoding
-    .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
+    .github/workflows/test.yml:80:    name: Unit tests
+    .github/workflows/text-hygiene.yml:35:    name: Line endings and encoding
+    .github/workflows/unicode-guard.yml:32:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
 
 That output is longer than it was when this document was written, and it is
-pasted again rather than added to, because six checks landed between the two
-runs and a block that carried only the newest name would disagree with the
-command above it.
+pasted again rather than added to, because the checks that landed between the
+runs would otherwise have to be appended one at a time and a block carrying only
+the newest name would disagree with the command above it. The line numbers move
+with it, which is the other half of why the block is re-pasted: three of these
+workflows were rewritten around their names.
 
 One job deliberately carries no name, and its own comment says why:
 `.github/workflows/dependency-review.yml` leaves the job id to become the
@@ -54,13 +57,14 @@ Two lines of that grep are not check runs at all. `SARIF file` and
 of materials workflow, and they are listed here so that somebody comparing the
 grep against the list below does not go looking for them.
 
-Four names in the grep are check runs and are not in the blocking list below:
-`Code scanning (CodeQL)`, `Dependency lock`, `Formatting, vet and lint` and
-`Bill of materials`. All four exist and all four report on a pull request. Each
-landed without being added here, which is what the last section of this document
-asks each change to do, so the omission is recorded rather than repaired in
-passing. Adding a name to the blocking list is an argument about what the branch
-should refuse, and that argument belongs to whoever makes it.
+Five names in the grep are check runs and are not in the blocking list below:
+`Code scanning (CodeQL)`, `Dependency lock`, `Formatting, vet and lint`,
+`Bill of materials` and `Documentation spelling`. All five exist and all five
+report on a pull request. Each landed without being added here, which is what
+the last section of this document asks each change to do, so the omission is
+recorded rather than repaired in passing. Adding a name to the blocking list is
+an argument about what the branch should refuse, and that argument belongs to
+whoever makes it.
 
 ## The names as they actually appear on a pull request
 
@@ -176,7 +180,7 @@ leaves none.
 The list is bounded by what exists at the moment it is asked for. `Build` was
 added to it by the change that landed the build check, and `Unit tests` by the
 change that landed the unit test check, which is what this section asks of every
-later one. Four checks that already exist did not, and the section above says
+later one. Five checks that already exist did not, and the section above says
 which. The quality milestone is where the list is compared against the reference
 gate, which is #89's work rather than this document's.
 

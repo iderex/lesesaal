@@ -52,15 +52,15 @@ What this repository runs, quoted from the workflows that produce the names:
     .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
     .github/workflows/dependency-lock.yml:73:    name: Dependency lock
-    .github/workflows/doc-hygiene.yml:74:    name: Documentation formatting, paths and internal links
-    .github/workflows/doc-hygiene.yml:263:    name: Documentation spelling
-    .github/workflows/doc-hygiene.yml:462:    name: External links
+    .github/workflows/doc-hygiene.yml:81:    name: Documentation formatting, paths and internal links
+    .github/workflows/doc-hygiene.yml:118:    name: Documentation spelling
+    .github/workflows/doc-hygiene.yml:317:    name: External links
     .github/workflows/lint.yml:67:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
     .github/workflows/test.yml:80:    name: Unit tests
-    .github/workflows/text-hygiene.yml:31:    name: Line endings and encoding
-    .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
+    .github/workflows/text-hygiene.yml:35:    name: Line endings and encoding
+    .github/workflows/unicode-guard.yml:32:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
 
 One job here carries no name so that its check run takes the job id, which is

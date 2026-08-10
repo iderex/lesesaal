@@ -279,6 +279,32 @@ func TestAnInvariantRefusalNamesTheRuleAndWhereItWasDecided(t *testing.T) {
 	}
 }
 
+// TestTheLegItselfRefusesASuppression is the suppression rule's half of the
+// test above, and it exists because that rule had no such half. Every near
+// miss for it calls suppressions directly, so its line could be taken out of
+// invariantRules and all six would stay green while the leg stopped judging
+// suppressions at all. Removing one line from a table is the mistake this is
+// cheap insurance against, and the empty-table case does not cover it: a table
+// holding one rule still examines something and still passes.
+func TestTheLegItselfRefusesASuppression(t *testing.T) {
+	f := suppressionTree("package a\n\n" + ignore + " all everything here is noise\nfunc A() {}\n")
+
+	result := invariants(f.env())
+	if result.Outcome != Failed {
+		t.Fatalf("a suppression naming no check identifier passed the invariant leg: %+v", result)
+	}
+	rule, found := ruleByID("suppression-names-a-check-and-a-reason")
+	if !found {
+		t.Fatal("the rule this test is about is not in the table")
+	}
+	if !strings.Contains(result.Output, rule.rule) {
+		t.Errorf("the refusal does not quote the rule:\n%s", result.Output)
+	}
+	if !strings.Contains(result.Output, rule.decided) {
+		t.Errorf("the refusal does not say where the rule was decided:\n%s", result.Output)
+	}
+}
+
 // TestTheInvariantLegSaysWhatEachRuleExamined keeps the leg honest about the
 // difference between a rule that read the tree and found nothing and a rule
 // that read nothing.

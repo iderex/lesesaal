@@ -92,50 +92,11 @@ jobs:
           # on the day the set stops being empty.
           cache: false
 
-      - name: Say what the dependency set and its lock are today
-        run: |
-          set -euo pipefail
-          # Printed before anything is judged, so a reader can tell a run over
-          # an empty dependency set from a run over a full one. `go list -m all`
-          # prints the main module and then every module the graph requires, so
-          # a line count of one is a graph with no requirement in it.
-          modules=$(go list -mod=readonly -m all)
-          if [ -z "$modules" ]; then
-            echo "::error::The module graph came out empty, which not even a module with no requirement does. Failing closed rather than judging nothing."
-            exit 1
-          fi
-          count=$(printf '%s\n' "$modules" | wc -l)
-          printf '%s\n' "$modules" | sed 's/^/  /'
-          echo "The module graph holds $count entry, including this module itself."
-          # The lock file is created by the toolchain the moment a requirement
-          # needs one, so its absence and an empty requirement set are the same
-          # fact rather than two. Saying which state the tree is in keeps a
-          # green run from being read as "the lock file was checked".
-          if [ -f go.sum ]; then
-            echo "The lock file holds $(wc -l < go.sum) line(s)."
-          else
-            echo "There is no lock file, because nothing outside this module is required yet."
-          fi
-
       - name: Refuse a module file the lock cannot account for
-        # Always report, so a failure above cannot hide this verdict and send
-        # somebody round the loop twice.
-        if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          # -diff reports what a tidy run WOULD change and changes nothing, so
-          # this is a verdict rather than a repair. The distinction is the whole
-          # point: a check that fixed the module file would let a drifted one
-          # land and then quietly correct it, and nobody would ever see the
-          # drift that a stale requirement or a missing lock entry represents.
-          #
-          # It exits non-zero when the module file or the lock file is not what
-          # the imports in the tree require, in either direction: a requirement
-          # nothing imports, an import nothing requires, or a lock file that
-          # does not cover the graph.
-          if go mod tidy -diff; then
-            echo "The module file and the lock file are exactly what the tree's imports require."
-            exit 0
-          fi
-          echo "::error::The module file or the lock file is not what the tree's imports require. The diff above is what 'go mod tidy' would change; run it and commit the result rather than letting a build resolve around it."
-          exit 1
+        # The leg is not written here. The step calls `go run . ci lock`, which
+        # is the same procedure a contributor runs before pushing, so the tree
+        # holds one gate and not two. It reports what a tidy run WOULD change
+        # and changes nothing, and it says whether the tree has a lock file at
+        # all, so a green run over an empty dependency set is not read as one
+        # over a checked lock file.
+        run: go run . ci lock

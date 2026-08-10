@@ -10,17 +10,20 @@
 // the server is worse than no local run at all, so the workflow steps call this
 // by leg name instead of restating what the leg does.
 //
-// Nothing here starts a process. Every leg reaches the machine through the two
-// functions in Env, which the entry point supplies from internal/system and a
-// test supplies from its own table, so this package's suite decides what a
-// command returned rather than running one. harness_test.go refuses os/exec
+// Nothing here starts a process and nothing here opens a file. Every leg
+// reaches the machine through the functions in Env, which the entry point
+// supplies from internal/system and a test supplies from its own table, so this
+// package's suite decides what a command returned and what a file held rather
+// than running one and reading the other. harness_test.go refuses os/exec
 // outside the wiring and that refusal is what makes the split real.
 package gate
 
 import (
 	"fmt"
 	"io"
+	"path"
 	"strings"
+	"unicode/utf8"
 )
 
 // Env is what a leg is allowed to reach outside this process.
@@ -34,6 +37,12 @@ type Env struct {
 	// decides it could not run, so that a missing tool is reported as a leg
 	// that did not run rather than as a tree that failed.
 	Look func(name string) bool
+
+	// Read returns the bytes of one file in the working tree. The legs that
+	// judge text need the bytes of every tracked file, and asking git for them
+	// one blob at a time costs a process each; the measurement that decided
+	// this is at system.Read.
+	Read func(name string) (string, error)
 }
 
 // Outcome is what a leg concluded. Three values rather than two: a leg that
@@ -76,11 +85,21 @@ type Leg struct {
 }
 
 // Legs returns the gate in the order it runs, which is the order a reader
-// wants: what the module claims, what it resolves to, whether it builds, how it
-// is written, what the analysers say, and finally whether it works.
+// wants: what the tree is stored as, what its documents say, what the module
+// claims, what it resolves to, whether it builds, how the code is written, what
+// the analysers say, and finally whether it works. The cheap legs come first on
+// purpose, because the run stops at the first failure and a contributor who
+// wrapped a line at 90 columns should not wait out a compile to hear about it.
 func Legs() []Leg {
 	return []Leg{
+		{ID: "line-endings", Title: "Every tracked text file is stored with LF", Judge: lineEndings},
+		{ID: "encoding", Title: "Every tracked text file decodes as UTF-8", Judge: encoding},
+		{ID: "unicode", Title: "No tracked text file carries a bidirectional or invisible control character", Judge: unicodeGuard},
+		{ID: "doc-format", Title: "Every tracked document is formatted for readable diffs", Judge: docFormat},
+		{ID: "doc-paths", Title: "Every path a document names resolves", Judge: docPaths},
+		{ID: "doc-links", Title: "Every internal link a document carries resolves", Judge: docLinks},
 		{ID: "mod-verify", Title: "The module's dependencies are what they claim to be", Judge: modVerify},
+		{ID: "lock", Title: "The module file and the lock file are what the tree's imports require", Judge: lock},
 		{ID: "deps", Title: "Every import resolves with dependency resolution switched off", Judge: deps},
 		{ID: "build", Title: "Every package compiles", Judge: build},
 		{ID: "gofmt", Title: "No Go file is one the formatter would change", Judge: gofmt},
@@ -105,11 +124,7 @@ type Uncovered struct {
 // the workflow files.
 func NotCovered() []Uncovered {
 	return []Uncovered{
-		{"Line endings and encoding", "written as git plumbing inside .github/workflows/text-hygiene.yml and not yet in this language"},
-		{"Reject Trojan Source Unicode", "written as git plumbing inside .github/workflows/unicode-guard.yml and not yet in this language"},
-		{"Documentation formatting, paths and internal links", "written as awk inside .github/workflows/doc-hygiene.yml and not yet in this language"},
 		{"Documentation spelling", "needs a speller and a word list this tree does not carry, and takes them from the runner image"},
-		{"Dependency lock", "written as shell inside .github/workflows/dependency-lock.yml and not yet in this language"},
 		{"Refuse a run that is elevated or has a display", "judges the machine a run landed on rather than the repository, and stays in .github/workflows/test.yml for that reason"},
 		{"Bill of materials", "needs a generator this tree does not carry"},
 		{"Audit workflows (zizmor)", "needs a runner this tree does not carry"},
@@ -235,12 +250,593 @@ func packages(env Env) ([]string, string, error) {
 // tracked lists what the repository stores. The file list comes from git
 // rather than from a directory walk, because a build directory or an editor
 // backup left in the checkout is not what is being judged.
+// An empty pattern means the whole tree, spelled as the pathspec git wants for
+// it, because the empty string is the one thing git refuses to read as "all
+// paths".
 func tracked(env Env, pattern string) ([]string, string, error) {
+	if pattern == "" {
+		pattern = "."
+	}
 	output, err := env.Run("git", "ls-files", pattern)
 	if err != nil {
 		return nil, output, err
 	}
 	return lines(output), output, nil
+}
+
+// stored is one tracked file with the line ending git holds it under.
+type stored struct {
+	// eol is the index attribute `git ls-files --eol` prints first: i/lf,
+	// i/crlf, i/mixed, i/none for a file with no line ending at all, and
+	// i/-text for a file git treats as binary.
+	eol string
+	// path is what the repository stores the file as, slashed on every
+	// platform because git prints it that way.
+	path string
+}
+
+// storedFiles lists every tracked file with the line ending of its blob. It is
+// the one place "a tracked text file" is decided, and three legs share it, so
+// the tree cannot be text for one leg and binary for the next.
+func storedFiles(env Env) ([]stored, string, error) {
+	output, err := env.Run("git", "ls-files", "--eol")
+	if err != nil {
+		return nil, output, err
+	}
+	found := []stored{}
+	for _, line := range lines(output) {
+		// The attribute fields are padded with spaces and the path is
+		// separated from them by a tab, so the last tab is the split.
+		tab := strings.LastIndex(line, "\t")
+		fields := strings.Fields(line)
+		if tab < 0 || len(fields) == 0 {
+			continue
+		}
+		found = append(found, stored{eol: fields[0], path: strings.TrimSpace(line[tab+1:])})
+	}
+	return found, output, nil
+}
+
+// text keeps the tracked files git does not treat as binary.
+func text(files []stored) []stored {
+	kept := []stored{}
+	for _, file := range files {
+		if file.eol == "i/-text" {
+			continue
+		}
+		kept = append(kept, file)
+	}
+	return kept
+}
+
+// WHICH COPY OF A FILE THESE LEGS JUDGE, because there are three and they
+// disagree. The line ending a file is STORED with is the blob's property and
+// nothing else can answer it, so lineEndings reads the index and reads it from
+// git. Everything below it judges the working tree, which is the same copy
+// gofmt, the compiler and the suite already judge: a contributor who fixes a
+// document, runs this and is told it is still wrong because the fix is not
+// staged would stop running it.
+//
+// The one place that would make the two disagree is a checkout filter, which
+// rewrites line endings on the way out and would otherwise make every line of
+// every document one column wider on a machine that checked out CRLF. That is
+// lineEndings' subject rather than these legs', so records below drops the
+// carriage return and lets the leg that owns the question answer it.
+
+// records splits a file the way a line-oriented tool reads it. A file whose
+// last byte is a newline does not end with an empty record, because every leg
+// below counts what it examined and an invented final record would make a
+// clean document report one line more than it has.
+func records(content string) []string {
+	if content == "" {
+		return nil
+	}
+	read := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+	for number, line := range read {
+		read[number] = strings.TrimSuffix(line, "\r")
+	}
+	return read
+}
+
+// lineEndings refuses a tracked text file whose blob is not stored with LF.
+// .gitattributes declares that the tree is stored with LF, and a declaration
+// changes nothing about bytes already in the repository: a contributor can put
+// anything into a blob with git plumbing. The declaration and this leg are two
+// different things and only this one bites.
+func lineEndings(env Env) Result {
+	files, listing, err := storedFiles(env)
+	if err != nil {
+		return failure("The tracked files could not be listed.", listing)
+	}
+	if len(files) == 0 {
+		return failure("No tracked file was examined. Failing closed rather than reporting a tree stored with LF.", listing)
+	}
+	examined := text(files)
+	if len(examined) == 0 {
+		return failure("No tracked text file was examined. Failing closed rather than reporting a tree stored with LF.", listing)
+	}
+	sentence := fmt.Sprintf("Examined %d tracked text file(s) of %d tracked file(s).", len(examined), len(files))
+	found := []string{}
+	for _, file := range examined {
+		if file.eol == "i/crlf" || file.eol == "i/mixed" {
+			found = append(found, fmt.Sprintf("FAIL  %s is stored as %s", file.path, strings.TrimPrefix(file.eol, "i/")))
+		}
+	}
+	if len(found) != 0 {
+		return failure(sentence, strings.Join(found, "\n")+
+			"\nThis tree is stored with LF; see .gitattributes. Re-add them with 'git add --renormalize .'")
+	}
+	return Result{Outcome: Passed, Examined: sentence}
+}
+
+// encoding refuses a tracked text file whose blob does not decode as UTF-8.
+// ASCII is a subset and passes, so what this catches is a file saved by an
+// editor that chose the machine's own code page, which is invisible in a diff
+// until the byte reaches somebody with a different one.
+func encoding(env Env) Result {
+	files, listing, err := storedFiles(env)
+	if err != nil {
+		return failure("The tracked files could not be listed.", listing)
+	}
+	examined := text(files)
+	if len(examined) == 0 {
+		return failure("No tracked text file was examined. Failing closed rather than reporting a tree that decodes.", listing)
+	}
+	sentence := fmt.Sprintf("Examined %d tracked text file(s) for UTF-8 validity.", len(examined))
+	found := []string{}
+	for _, file := range examined {
+		content, err := env.Read(file.path)
+		if err != nil {
+			return failure("A tracked text file could not be read. Failing closed rather than skipping it.", err.Error())
+		}
+		if !utf8.ValidString(content) {
+			found = append(found, "FAIL  "+file.path+" does not decode as UTF-8")
+		}
+	}
+	if len(found) != 0 {
+		return failure(sentence, strings.Join(found, "\n")+
+			"\nThis tree is UTF-8; convert the file rather than adding an exception.")
+	}
+	return Result{Outcome: Passed, Examined: sentence}
+}
+
+// deceptive is the set of characters that make a file read differently from
+// how it behaves: the bidirectional controls of Trojan Source, CVE-2021-42574,
+// and the zero-width characters that hide inside a word. Accents, em dashes and
+// every other benign non-ASCII character are not in the set.
+//
+// U+FEFF is deliberately absent. A leading byte order mark is legitimate, the
+// reordering attack does not rely on one, and refusing it would red a tree for
+// something that is not the defect.
+var deceptive = map[rune]string{
+	0x061C: "ARABIC LETTER MARK",
+	0x200B: "ZERO WIDTH SPACE",
+	0x200C: "ZERO WIDTH NON-JOINER",
+	0x200D: "ZERO WIDTH JOINER",
+	0x200E: "LEFT-TO-RIGHT MARK",
+	0x200F: "RIGHT-TO-LEFT MARK",
+	0x202A: "LEFT-TO-RIGHT EMBEDDING",
+	0x202B: "RIGHT-TO-LEFT EMBEDDING",
+	0x202C: "POP DIRECTIONAL FORMATTING",
+	0x202D: "LEFT-TO-RIGHT OVERRIDE",
+	0x202E: "RIGHT-TO-LEFT OVERRIDE",
+	0x2060: "WORD JOINER",
+	0x2066: "LEFT-TO-RIGHT ISOLATE",
+	0x2067: "RIGHT-TO-LEFT ISOLATE",
+	0x2068: "FIRST STRONG ISOLATE",
+	0x2069: "POP DIRECTIONAL ISOLATE",
+}
+
+// unicodeGuard refuses a character from that set anywhere in tracked text. It
+// names the file, the line and the codepoint, because the whole property of
+// these characters is that a reader cannot see them, so a report saying only
+// which file is one nobody can act on.
+func unicodeGuard(env Env) Result {
+	files, listing, err := storedFiles(env)
+	if err != nil {
+		return failure("The tracked files could not be listed.", listing)
+	}
+	examined := text(files)
+	if len(examined) == 0 {
+		return failure("No tracked text file was examined. Failing closed rather than reporting a tree with nothing hidden in it.", listing)
+	}
+	sentence := fmt.Sprintf("Examined %d tracked text file(s) against %d refused character(s).", len(examined), len(deceptive))
+	found := []string{}
+	for _, file := range examined {
+		content, err := env.Read(file.path)
+		if err != nil {
+			return failure("A tracked text file could not be read. Failing closed rather than skipping it.", err.Error())
+		}
+		for number, line := range records(content) {
+			for _, character := range line {
+				name, refused := deceptive[character]
+				if !refused {
+					continue
+				}
+				found = append(found, fmt.Sprintf("FAIL  %s:%d carries U+%04X (%s)", file.path, number+1, character, name))
+			}
+		}
+	}
+	if len(found) != 0 {
+		return failure(sentence, strings.Join(found, "\n")+
+			"\nThese characters make source render differently from how it executes, which is the attack this refuses. Remove them.")
+	}
+	return Result{Outcome: Passed, Examined: sentence}
+}
+
+// columns is the width this tree wraps prose at. It is the tree's own limit
+// rather than a number chosen here: it was measured over every tracked document
+// outside code blocks on the day the check landed, and the one line that was
+// over it was rewrapped in the same change.
+const columns = 81
+
+// documents keeps the tracked documents out of the tracked file list. They are
+// what all three document legs judge and nothing else: the workflow files, the
+// certificate and the attributes file carry prose in comments and no leg here
+// reads it. It filters a list the caller already holds rather than asking git a
+// second question, because every question costs a process.
+func documents(all []string) []string {
+	kept := []string{}
+	for _, file := range all {
+		if strings.HasSuffix(file, ".md") {
+			kept = append(kept, file)
+		}
+	}
+	return kept
+}
+
+// docFormat refuses a document that is not written the way this tree stores
+// documents. The convention is hard wrapping, so a one-word edit produces a
+// one-line diff instead of reflowing a paragraph and hiding the change inside
+// it.
+//
+// Code blocks are exempt from the width in both spellings, fenced and indented.
+// A pasted command and its output have to stay byte-exact, and wrapping one
+// would make it a command nobody can run. They are not exempt from the tab, the
+// trailing space or the second blank line, because none of those is load
+// bearing in a transcript either.
+func docFormat(env Env) Result {
+	all, listing, err := tracked(env, "")
+	if err != nil {
+		return failure("The tracked files could not be listed.", listing)
+	}
+	files := documents(all)
+	if len(files) == 0 {
+		return failure("No tracked document was examined. Failing closed rather than reporting a clean tree.", listing)
+	}
+	found := []string{}
+	counted := 0
+	for _, file := range files {
+		content, err := env.Read(file)
+		if err != nil {
+			return failure("A tracked document could not be read. Failing closed rather than skipping it.", err.Error())
+		}
+		if content == "" {
+			found = append(found, "FAIL  "+file+" is empty")
+			continue
+		}
+		if !strings.HasSuffix(content, "\n") {
+			found = append(found, "FAIL  "+file+" does not end with a newline")
+		}
+		read := records(content)
+		if read[len(read)-1] == "" {
+			found = append(found, "FAIL  "+file+" ends with a blank line")
+		}
+		infence := false
+		// The line before this one, so two blank lines in a row can be told
+		// from one. The first line of a file has no predecessor and the value
+		// below is deliberately not the empty string, which would make a
+		// document opening on a blank line report a second one.
+		previous := "start of file"
+		for number, line := range read {
+			where := fmt.Sprintf("%s:%d", file, number+1)
+			if strings.HasPrefix(line, "```") {
+				infence = !infence
+				previous = line
+				continue
+			}
+			incode := infence || strings.HasPrefix(line, "    ")
+			if strings.HasSuffix(line, " ") || strings.HasSuffix(line, "\t") {
+				found = append(found, "FAIL  "+where+" has trailing whitespace")
+			}
+			if strings.Contains(line, "\t") {
+				found = append(found, "FAIL  "+where+" contains a tab")
+			}
+			if line == "" && previous == "" {
+				found = append(found, "FAIL  "+where+" is the second of two blank lines")
+			}
+			// Columns rather than bytes, so a document carrying a non-ASCII
+			// character is judged by what a reader sees rather than by how many
+			// bytes it took to store it.
+			if width := utf8.RuneCountInString(line); !incode && width > columns {
+				found = append(found, fmt.Sprintf("FAIL  %s is %d columns, over the %d this tree wraps at", where, width, columns))
+			}
+			counted++
+			previous = line
+		}
+	}
+	sentence := fmt.Sprintf("Examined %d line(s) in %d tracked document(s) for formatting.", counted, len(files))
+	if counted == 0 {
+		return failure("No line was examined. Failing closed rather than reporting documents that are formatted.", strings.Join(found, "\n"))
+	}
+	if len(found) != 0 {
+		return failure(sentence, strings.Join(found, "\n")+
+			"\nWrap prose at 81 columns, drop trailing whitespace and tabs, and end the file with one newline.")
+	}
+	return Result{Outcome: Passed, Examined: sentence}
+}
+
+// docPaths refuses a document naming a path that does not exist. This is the
+// leg that earns the three: this plan depends on documents pointing at each
+// other, at the workflows and at the attributes file, and a pointer to
+// something renamed is invisible until somebody follows it.
+//
+// It resolves against what git tracks rather than against what is in the
+// checkout, which is stricter in one direction on purpose: a document may not
+// point at a file that exists on the author's machine and in no clone.
+func docPaths(env Env) Result {
+	all, listing, err := tracked(env, "")
+	if err != nil {
+		return failure("The tracked files could not be listed.", listing)
+	}
+	files := documents(all)
+	if len(files) == 0 {
+		return failure("No tracked document was examined. Failing closed rather than reporting a clean tree.", listing)
+	}
+	exists := reachable(all)
+	found := []string{}
+	counted := 0
+	for _, file := range files {
+		content, err := env.Read(file)
+		if err != nil {
+			return failure("A tracked document could not be read. Failing closed rather than skipping it.", err.Error())
+		}
+		infence := false
+		for _, line := range records(content) {
+			if strings.HasPrefix(line, "```") {
+				infence = !infence
+				continue
+			}
+			// A pasted transcript names paths in other repositories and in
+			// other people's machines, and this tree cannot resolve those.
+			if infence || strings.HasPrefix(line, "    ") {
+				continue
+			}
+			for _, token := range backticked(line) {
+				if !pathLike(token) {
+					continue
+				}
+				counted++
+				if resolves(exists, file, token) {
+					continue
+				}
+				found = append(found, "FAIL  "+file+" names "+token+", which does not exist")
+			}
+		}
+	}
+	sentence := fmt.Sprintf("Examined %d path reference(s) in %d tracked document(s).", counted, len(files))
+	if len(found) != 0 {
+		return failure(sentence, strings.Join(found, "\n")+
+			"\nName no path you do not intend to resolve.")
+	}
+	return Result{Outcome: Passed, Examined: sentence}
+}
+
+// docLinks refuses a link that goes nowhere. A link in a document is a promise
+// that the thing at the other end exists.
+//
+// The fragment on a local target is stripped and not checked. Following it
+// means deriving the anchor slugs of somebody else's renderer, which is a guess
+// rather than a check, and a wrong guess reds a document that is correct.
+func docLinks(env Env) Result {
+	all, listing, err := tracked(env, "")
+	if err != nil {
+		return failure("The tracked files could not be listed.", listing)
+	}
+	files := documents(all)
+	if len(files) == 0 {
+		return failure("No tracked document was examined. Failing closed rather than reporting a clean tree.", listing)
+	}
+	exists := reachable(all)
+	found := []string{}
+	counted := 0
+	for _, file := range files {
+		content, err := env.Read(file)
+		if err != nil {
+			return failure("A tracked document could not be read. Failing closed rather than skipping it.", err.Error())
+		}
+		infence := false
+		for _, line := range records(content) {
+			if strings.HasPrefix(line, "```") {
+				infence = !infence
+				continue
+			}
+			if infence {
+				continue
+			}
+			for _, target := range linkTargets(line) {
+				if target == "" || strings.HasPrefix(target, "#") ||
+					strings.HasPrefix(target, "http:") || strings.HasPrefix(target, "https:") ||
+					strings.HasPrefix(target, "mailto:") {
+					continue
+				}
+				counted++
+				local := target
+				if hash := strings.Index(local, "#"); hash >= 0 {
+					local = local[:hash]
+				}
+				if local == "" || resolves(exists, file, local) {
+					continue
+				}
+				found = append(found, "FAIL  "+file+" links to "+target+", which does not exist")
+			}
+		}
+	}
+	sentence := fmt.Sprintf("Examined %d internal link(s) in %d tracked document(s).", counted, len(files))
+	if len(found) != 0 {
+		return failure(sentence, strings.Join(found, "\n")+
+			"\nA link in a document is a promise that the thing at the other end exists.")
+	}
+	return Result{Outcome: Passed, Examined: sentence}
+}
+
+// reachable is every path a document is allowed to name: the tracked files and
+// the directories they sit in, because a document naming a directory is naming
+// something that exists.
+func reachable(all []string) map[string]bool {
+	found := make(map[string]bool, len(all)*2)
+	for _, file := range all {
+		found[file] = true
+		for dir := path.Dir(file); dir != "." && dir != "/"; dir = path.Dir(dir) {
+			found[dir] = true
+		}
+	}
+	return found
+}
+
+// resolves reports whether a token names something, relative to the directory
+// of the document naming it first and then from the repository root, which is
+// how the documents under docs/ already name their siblings.
+func resolves(exists map[string]bool, from string, token string) bool {
+	candidates := []string{token}
+	if dir := path.Dir(from); dir != "." {
+		candidates = append(candidates, dir+"/"+token)
+	}
+	for _, candidate := range candidates {
+		candidate = strings.TrimSuffix(candidate, "/")
+		if candidate == "" {
+			continue
+		}
+		if exists[path.Clean(candidate)] {
+			return true
+		}
+	}
+	return false
+}
+
+// backticked returns what a line writes between backticks, in order. A pair
+// with nothing between them yields no token and the closing backtick is offered
+// again as an opening one, which is what a line like “a“ requires.
+func backticked(line string) []string {
+	tokens := []string{}
+	for {
+		open := strings.Index(line, "`")
+		if open < 0 {
+			return tokens
+		}
+		rest := line[open+1:]
+		shut := strings.Index(rest, "`")
+		if shut < 0 {
+			return tokens
+		}
+		if shut == 0 {
+			line = rest
+			continue
+		}
+		tokens = append(tokens, rest[:shut])
+		line = rest[shut+1:]
+	}
+}
+
+// extensions are the suffixes that make a backticked word a path even when it
+// carries no slash.
+var extensions = []string{".md", ".yml", ".yaml", ".json", ".toml", ".go", ".txt", ".sum", ".mod"}
+
+// pathLike decides whether a backticked token is a path this tree should be
+// able to resolve. A token holding a character no path here uses is a command,
+// an identifier or a field name, and judging one of those as a missing file is
+// how a check earns being ignored.
+func pathLike(token string) bool {
+	if token == "" {
+		return false
+	}
+	for position := 0; position < len(token); position++ {
+		character := token[position]
+		alphanumeric := character >= 'a' && character <= 'z' ||
+			character >= 'A' && character <= 'Z' ||
+			character >= '0' && character <= '9'
+		switch {
+		case alphanumeric, character == '_', character == '.':
+		case position != 0 && (character == '/' || character == '-'):
+		default:
+			return false
+		}
+	}
+	if strings.Contains(token, "/") {
+		return true
+	}
+	for _, extension := range extensions {
+		if strings.HasSuffix(token, extension) {
+			return true
+		}
+	}
+	return false
+}
+
+// linkTargets returns what a line writes inside the parentheses of a markdown
+// link, in order.
+func linkTargets(line string) []string {
+	targets := []string{}
+	for {
+		open := strings.Index(line, "](")
+		if open < 0 {
+			return targets
+		}
+		rest := line[open+2:]
+		shut := strings.Index(rest, ")")
+		if shut < 0 {
+			return targets
+		}
+		targets = append(targets, rest[:shut])
+		line = rest[shut+1:]
+	}
+}
+
+// lock refuses a module file or a lock file that is not what the tree's imports
+// require, in either direction: a requirement nothing imports, an import
+// nothing requires, or a lock file that does not cover the graph.
+//
+// It reports what a tidy run WOULD change and changes nothing, which is the
+// whole point. A leg that repaired the module file would let a drifted one land
+// and then quietly correct it, and nobody would ever see the drift.
+func lock(env Env) Result {
+	graph, output, err := func() ([]string, string, error) {
+		out, err := env.Run("go", "list", "-mod=readonly", "-m", "all")
+		if err != nil {
+			return nil, out, err
+		}
+		return lines(out), out, nil
+	}()
+	if err != nil {
+		return failure("The module graph could not be listed.", output)
+	}
+	if len(graph) == 0 {
+		return failure("The module graph came out empty, which not even a module with no requirement does. Failing closed rather than judging nothing.", output)
+	}
+	// Which state the tree is in, so a green run is not read as "the lock file
+	// was checked" on a tree that has none. The toolchain writes the lock file
+	// the moment a requirement needs one, so its absence and an empty
+	// requirement set are the same fact rather than two.
+	sentence := fmt.Sprintf("Examined a module graph of %d entry(s), this module included.", len(graph))
+	held, listing, err := tracked(env, "go.sum")
+	if err != nil {
+		return failure("The tree could not be asked whether it holds a lock file.", listing)
+	}
+	if len(held) == 0 {
+		sentence += " There is no lock file, because nothing outside this module is required yet."
+	} else {
+		content, err := env.Read("go.sum")
+		if err != nil {
+			return failure("The lock file is tracked and could not be read. Failing closed rather than reporting it absent.", err.Error())
+		}
+		sentence += fmt.Sprintf(" The lock file holds %d line(s).", len(lines(content)))
+	}
+	diff, err := env.Run("go", "mod", "tidy", "-diff")
+	if err != nil {
+		return failure(sentence, diff+
+			"\nThe diff above is what 'go mod tidy' would change; run it and commit the result rather than letting a build resolve around it.")
+	}
+	return Result{Outcome: Passed, Examined: sentence}
 }
 
 func modVerify(env Env) Result {

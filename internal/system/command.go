@@ -1,6 +1,7 @@
 package system
 
 import (
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -23,6 +24,24 @@ func Run(name string, args ...string) (string, error) {
 	command := exec.Command(name, args...)
 	output, err := command.CombinedOutput()
 	return string(output), err
+}
+
+// Read returns the bytes of one file. It is here for the same reason Run is:
+// what it finds is whatever the machine happens to hold, so the gate takes it
+// as a dependency and its suite answers from a table instead of from a disk.
+//
+// The alternative was `git cat-file blob` once per file, which is correct and
+// unusable: measured on this repository's 70 tracked files on 2026-08-10, on
+// windows/amd64, that spelling took 1m53s for one leg because every file costs
+// a process, and a gate a contributor will not wait for is a gate nobody runs.
+//
+//	go build -o gate.exe . && time ./gate.exe ci encoding
+//	PASS  encoding
+//	      Examined 70 tracked text file(s) for UTF-8 validity.
+//	real    1m53,543s
+func Read(name string) (string, error) {
+	content, err := os.ReadFile(name)
+	return string(content), err
 }
 
 // Look reports whether a program can be found on the path. It answers the

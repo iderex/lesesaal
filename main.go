@@ -44,7 +44,7 @@ func main() {
 		if len(os.Args) > 2 {
 			leg = os.Args[2]
 		}
-		os.Exit(gate.Run(os.Stdout, gate.Env{Run: system.Run, Look: system.Look}, leg))
+		os.Exit(gate.Run(os.Stdout, gate.Env{Run: system.Run, Look: system.Look, Read: system.Read}, leg))
 	}
 
 	// A nil field is a dependency nobody supplied. A program that starts on one

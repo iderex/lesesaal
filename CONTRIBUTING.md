@@ -175,7 +175,7 @@ the command rather than trusting the paste:
     .github/workflows/doc-hygiene.yml:81:    name: Documentation formatting, paths and internal links
     .github/workflows/doc-hygiene.yml:118:    name: Documentation spelling
     .github/workflows/doc-hygiene.yml:317:    name: External links
-    .github/workflows/lint.yml:67:    name: Formatting, vet and lint
+    .github/workflows/lint.yml:76:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
     .github/workflows/test.yml:80:    name: Unit tests
@@ -205,12 +205,14 @@ words in one, against a general word list and the project dictionary in
 carries is added there rather than worked around. `External links` follows the
 links that leave this repository, weekly rather than on a pull request.
 `Formatting, vet and lint` is the formatter, the toolchain's correctness
-analyser and the linter, in that order. `Bill of materials` produces the
-inventory of what is in here and refuses one that has stopped covering an
-ecosystem the tree carries. `Scorecard analysis` scores supply chain hygiene
-and reports to the security dashboard. `Unit tests` runs the suite on a stock
-runner with no display and no elevation, and fails a run that selected no test
-at all.
+analyser, the linter and the rules of this project that are plain text facts
+about the tree, in that order. That last leg is the one whose rules are written
+in documents rather than in a tool's own set, so its refusal quotes the rule
+and says where it was decided. `Bill of materials` produces the inventory of
+what is in here and refuses one that has stopped covering an ecosystem the tree
+carries. `Scorecard analysis` scores supply chain hygiene and reports to the
+security dashboard. `Unit tests` runs the suite on a stock runner with no
+display and no elevation, and fails a run that selected no test at all.
 `Line endings and encoding` refuses a tracked text file that is not
 stored with LF or does not decode as UTF-8. `Reject Trojan Source Unicode`
 refuses bidirectional and invisible control characters, which exist to make a

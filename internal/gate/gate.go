@@ -98,6 +98,7 @@ func Legs() []Leg {
 		{ID: "doc-format", Title: "Every tracked document is formatted for readable diffs", Judge: docFormat},
 		{ID: "doc-paths", Title: "Every path a document names resolves", Judge: docPaths},
 		{ID: "doc-links", Title: "Every internal link a document carries resolves", Judge: docLinks},
+		{ID: "invariants", Title: "Every rule of this project that is a text fact about the tree holds", Judge: invariants},
 		{ID: "mod-verify", Title: "The module's dependencies are what they claim to be", Judge: modVerify},
 		{ID: "lock", Title: "The module file and the lock file are what the tree's imports require", Judge: lock},
 		{ID: "deps", Title: "Every import resolves with dependency resolution switched off", Judge: deps},

@@ -185,15 +185,38 @@ rather than blocks.
 
 ## Formatting, vet and lint
 
-The trip case is one file that compiles on purpose and trips each of the three
-legs once: a space inside the parameter list and spaces for indentation, a
-format verb given the wrong type, and a comparison against a boolean constant
-in a function nothing calls.
+Two runs, because a fourth leg was added to this check after the first one was
+taken and a run showing three legs red says nothing about the fourth.
+
+The first trip case is one file that compiles on purpose and trips each of the
+first three legs once: a space inside the parameter list and spaces for
+indentation, a format verb given the wrong type, and a comparison against a
+boolean constant in a function nothing calls.
 
     https://github.com/iderex/lesesaal/actions/runs/31264989341/job/93121582520
 
-It prevents a diff whose real change is hidden inside a reformatting, and the
-class of defect the analyser and the linter each name.
+The second is the fourth leg, which refuses the rules of this project that are
+plain text facts about the tree. Two violations in one run, each written the
+way somebody would actually write it: a blanket suppression carrying a name
+that is not a check identifier, copied from the habit of another linter, and
+one line number in a pasted check listing left behind by a workflow rewrite.
+
+    https://github.com/iderex/lesesaal/actions/runs/31376122114/job/93415632069
+
+    FAIL  main.go:34 names "all", which is not a check identifier this project can look up against `staticcheck -list-checks`
+    FAIL  docs/required-checks.md:32 pastes ".github/workflows/doc-hygiene.yml:263:    name: Documentation spelling" where the command it quotes produces ".github/workflows/doc-hygiene.yml:118:    name: Documentation spelling"
+
+The suppression is written in the spelling the formatter keeps. The first
+attempt used one it would have rewritten, which reddened the formatting leg as
+well and left the run unable to say which leg refused what. Only the fourth
+step is red in the run above, and it is the only failing check on that commit:
+
+    gh api repos/iderex/lesesaal/commits/d2f18af/check-runs --jq '[.check_runs[] | select(.conclusion=="failure")] | length'
+    1
+
+It prevents a diff whose real change is hidden inside a reformatting, the class
+of defect the analyser and the linter each name, and a rule of this project
+that a document states and nothing refuses.
 
 ## Bill of materials
 

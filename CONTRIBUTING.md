@@ -168,18 +168,19 @@ the command rather than trusting the paste:
 
     git grep -n '^    name:' -- .github/workflows/
     .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
-    .github/workflows/build.yml:47:    name: Build
+    .github/workflows/build.yml:60:    name: Build
     .github/workflows/codeql.yml:69:    name: Code scanning (CodeQL)
     .github/workflows/dco.yml:24:    name: DCO sign-off
     .github/workflows/dependency-lock.yml:73:    name: Dependency lock
-    .github/workflows/doc-hygiene.yml:60:    name: Documentation formatting, paths and internal links
-    .github/workflows/doc-hygiene.yml:249:    name: External links
-    .github/workflows/lint.yml:60:    name: Formatting, vet and lint
+    .github/workflows/doc-hygiene.yml:81:    name: Documentation formatting, paths and internal links
+    .github/workflows/doc-hygiene.yml:118:    name: Documentation spelling
+    .github/workflows/doc-hygiene.yml:317:    name: External links
+    .github/workflows/lint.yml:67:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis
-    .github/workflows/test.yml:69:    name: Unit tests
-    .github/workflows/text-hygiene.yml:31:    name: Line endings and encoding
-    .github/workflows/unicode-guard.yml:23:    name: Reject Trojan Source Unicode
+    .github/workflows/test.yml:80:    name: Unit tests
+    .github/workflows/text-hygiene.yml:35:    name: Line endings and encoding
+    .github/workflows/unicode-guard.yml:32:    name: Reject Trojan Source Unicode
     .github/workflows/zizmor.yml:40:    name: Audit workflows (zizmor)
 
 One job deliberately carries no name so that its check run takes the job id
@@ -198,14 +199,18 @@ file that is not what the tree's imports require, and `docs/dependencies.md` is
 the inventory behind it.
 `Documentation formatting, paths and internal links` refuses a document that is
 not wrapped the way this tree wraps, that names a path which does not exist, or
-that links to something which is not there. `External links` follows the links
-that leave this repository, weekly rather than on a pull request. `Formatting,
-vet and lint` is the formatter, the toolchain's correctness analyser and the
-linter, in that order. `Bill of materials` produces the inventory of what is in
-here and refuses one that has stopped covering an ecosystem the tree carries.
-`Scorecard analysis` scores supply chain hygiene and reports to the security
-dashboard. `Unit tests` runs the suite on a stock runner with no display and no
-elevation, and fails a run that selected no test at all.
+that links to something which is not there. `Documentation spelling` judges the
+words in one, against a general word list and the project dictionary in
+`.github/dictionary.txt`, and a term this project means but no dictionary
+carries is added there rather than worked around. `External links` follows the
+links that leave this repository, weekly rather than on a pull request.
+`Formatting, vet and lint` is the formatter, the toolchain's correctness
+analyser and the linter, in that order. `Bill of materials` produces the
+inventory of what is in here and refuses one that has stopped covering an
+ecosystem the tree carries. `Scorecard analysis` scores supply chain hygiene
+and reports to the security dashboard. `Unit tests` runs the suite on a stock
+runner with no display and no elevation, and fails a run that selected no test
+at all.
 `Line endings and encoding` refuses a tracked text file that is not
 stored with LF or does not decode as UTF-8. `Reject Trojan Source Unicode`
 refuses bidirectional and invisible control characters, which exist to make a

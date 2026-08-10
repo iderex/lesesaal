@@ -150,7 +150,7 @@ func TestAGreenTreeRunsEveryLeg(t *testing.T) {
 			t.Errorf("leg %s is not reported as passing:\n%s", leg.ID, report)
 		}
 	}
-	if want := "15 leg(s) passed, 0 failed, 0 did not run"; !strings.Contains(report, want) {
+	if want := "16 leg(s) passed, 0 failed, 0 did not run"; !strings.Contains(report, want) {
 		t.Errorf("the summary does not say %q:\n%s", want, report)
 	}
 }

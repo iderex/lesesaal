@@ -1,8 +1,15 @@
 # The formatting, vet and lint check (#22). Formatting arguments are a tax on
 # every later review and the only way to stop paying it is to make formatting a
-# verdict rather than a preference. Three legs, in the order a reader wants
+# verdict rather than a preference. Four legs, in the order a reader wants
 # them: the formatter reports no difference, the toolchain's own correctness
-# analyser is clean, and the linter set this project chose is clean.
+# analyser is clean, the linter set this project chose is clean, and the rules
+# of this project that are plain text facts about the tree hold.
+#
+# The fourth leg is #94's class and it lands here rather than under a name of
+# its own. A new check-run name is a name four documents have to carry and a
+# branch protection request has to be re-made, and this leg judges the same
+# source the three above it judge. What it adds is the rules a reader of a
+# document is currently the only thing holding.
 #
 # Its check-run name is `Formatting, vet and lint` and that name is part of the
 # contract. The branch protection request in docs/required-checks.md quotes
@@ -113,3 +120,7 @@ jobs:
       - name: Refuse a finding from the linter set this project chose
         if: ${{ !cancelled() }}
         run: go run . ci staticcheck
+
+      - name: Refuse a tree that breaks a rule this project states in prose
+        if: ${{ !cancelled() }}
+        run: go run . ci invariants

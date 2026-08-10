@@ -31,7 +31,7 @@ quoted rather than described.
     .github/workflows/doc-hygiene.yml:81:    name: Documentation formatting, paths and internal links
     .github/workflows/doc-hygiene.yml:118:    name: Documentation spelling
     .github/workflows/doc-hygiene.yml:317:    name: External links
-    .github/workflows/lint.yml:67:    name: Formatting, vet and lint
+    .github/workflows/lint.yml:74:    name: Formatting, vet and lint
     .github/workflows/sbom.yml:56:    name: Bill of materials
     .github/workflows/sbom.yml:281:          name: sbom-spdx-json
     .github/workflows/scorecard.yml:49:    name: Scorecard analysis

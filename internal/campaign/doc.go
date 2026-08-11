@@ -11,8 +11,9 @@
 // interface here and main.go supplies the implementation.
 //
 // What is here so far is the dependencies the program takes rather than reads,
-// and the campaign definition boundary: the types a campaign owner's written
-// definition becomes, and the refusal of one that asks something this project
-// does not support. The rest of #32 is the subject, the classification, the
-// answer and the label, and #34 records one.
+// the campaign definition boundary, which is the types a campaign owner's
+// written definition becomes and the refusal of one that asks something this
+// project does not support, and the consensus rule, which is the answer, the
+// label and the count that turns a subject's answers into one. The rest of #32
+// is the subject and the classification, and #34 records one.
 package campaign

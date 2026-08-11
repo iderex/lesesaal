@@ -107,8 +107,9 @@ configuration change on the host, made by the person who runs the host.
 
 ## What this document is for
 
-The sovereignty statement, #103, states the position in the words an operator
-reads. The test that proves nothing leaves the host, #104, refuses a deployment
+`sovereignty.md` states the position in the words an operator reads, and says
+of each clause whether something refuses a violation of it or whether it is a
+claim. The test that proves nothing leaves the host, #104, refuses a deployment
 that makes a connection this list does not permit. Both take the permitted list
 from here rather than restating it, so that widening what may leave the host is
 one change in one file and is visible as one.

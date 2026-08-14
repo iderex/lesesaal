@@ -4,8 +4,8 @@ Written for issue #23. Everything the quality milestone asks for assumes the
 dependency set is known. A project that resolves versions at build time has no
 such set, so a scan of it proves nothing about what will be installed tomorrow.
 
-This document says what the set is, what pins each part of it, what the pin is
-worth, and what happens when one of them is updated.
+The set below names each dependency, what pins each part of it, what the pin
+is worth, and what happens when one of them is updated.
 
 ## The Go module
 

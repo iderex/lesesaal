@@ -15,14 +15,14 @@ needed to build the program or to run its tests.
     go test ./...
 
 `go.mod` is the only place the toolchain version is written down, and every
-workflow reads it from there rather than repeating it, so a contributor and the
-server compile with the same toolchain by construction rather than by
-agreement. `docs/toolchain.md` is where the language was chosen, and it says
-what the choice costs as well as what it buys.
+workflow reads it from there. A contributor and the server therefore compile
+with the same toolchain by construction, and no agreement between them has to
+hold. `docs/toolchain.md` is where the language was chosen, and it says what
+the choice costs as well as what it buys.
 
 The module carries no dependency at all today, so a first build needs no
 network and there is nothing to restore. One gate leg needs a program the
-toolchain does not ship, installed by pinned version rather than from a package
+toolchain does not ship, installed at a pinned version and not from a package
 manager:
 
     go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
@@ -46,12 +46,12 @@ against the thing that decides it.
 The run ends by saying what it did not do and why, which is the part worth
 reading. Some of the gate is still shell inside a workflow file, some of it
 needs a tool this tree does not carry, and some of it is server-side by
-nature. All three are named in the report rather than left out of it.
+nature. The report names all three, and leaves none of them out.
 
 The command does not install the linter the section above pins, and on a clone
 without it the linter leg reports that it did not run and says that install
 line back to you. A leg that did not run is not a leg that passed, and the
-summary counts the three states apart rather than two.
+summary counts three states and not two.
 
 Naming a leg requires it. `go run . ci staticcheck` on a machine without the
 linter fails rather than reporting a disclosure, because asking for a leg by
@@ -70,8 +70,8 @@ repository reads that line today; it is a convention every issue here already
 follows, and the section below on foreign paths is what it is for.
 
 The templates under `.github/ISSUE_TEMPLATE/` ask for that shape directly. A
-bug report asks for the smallest reproduction rather than a description of one,
-cut down until removing one more step makes the problem stop happening.
+bug report asks for the smallest reproduction itself and not a description of
+one, cut down until removing one more step makes the problem stop happening.
 
 ## Signing off a commit
 
@@ -82,7 +82,7 @@ repository, and signing off is how you assert it.
     git commit -s
 
 The trailer has to match the commit's author exactly, name and address, which
-is why it is produced by the flag rather than typed. Where a branch already
+is why the flag produces it and nobody types it. Where a branch already
 carries commits without it:
 
     git rebase --signoff <base>
@@ -115,9 +115,9 @@ carried by review and by nothing else.
 Small enough that one person can hold the whole of it while reading it. There
 is no number in this repository and no check that measures one.
 
-A change that will not fit is usually an issue whose scope was planned wrong
-rather than a change that needs an exception, and the first response is to
-divide the issue rather than the finished diff. Two pull requests carved out of
+A change that will not fit is usually an issue whose scope was planned wrong,
+and not a change that needs an exception. The first response is to divide the
+issue rather than the finished diff. Two pull requests carved out of
 one change only make sense together and neither is reviewable alone, which
 satisfies the size and defeats the reason for it. Dividing the issue gives each
 half its own reason to exist and its own definition of done.
@@ -140,7 +140,7 @@ states, and they take three different words.
 
 The last section of the template is the one most often left empty and the one
 worth most. A condition on the issue that the change does not meet belongs
-there by name rather than left to be noticed. A sentence admitting that
+there by name, and is not left for a reader to notice. A sentence admitting that
 something was not done stays negative through every later edit; turning such a
 line into a tick is worse than deleting it.
 
@@ -164,7 +164,7 @@ it reached and why it had to, and leave the merge to whoever holds that path.
 
 The workflow files are the authority rather than this list, and a check that
 lands after this paragraph was last touched will be in them and not in it. Run
-the command rather than trusting the paste:
+the command, and do not trust the paste:
 
     git grep -n '^    name:' -- .github/workflows/
     .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
@@ -202,8 +202,9 @@ not wrapped the way this tree wraps, that names a path which does not exist, or
 that links to something which is not there. `Documentation spelling` judges the
 words in one, against a general word list and the project dictionary in
 `.github/dictionary.txt`, and a term this project means but no dictionary
-carries is added there rather than worked around. `External links` follows the
-links that leave this repository, weekly rather than on a pull request.
+carries is added to that file, never worked around. `External links` follows
+the links that leave this repository, on a weekly schedule and not on a pull
+request.
 `Formatting, vet and lint` is the formatter, the toolchain's correctness
 analyser, the linter and the rules of this project that are plain text facts
 about the tree, in that order. That last leg is the one whose rules are written
@@ -228,16 +229,16 @@ request for that and is not a description of the current setting.
 ## Style
 
 English in artefacts. No attribution to a tool, no generated-by marker, and
-nothing naming what produced a change rather than what the change does.
+nothing that names what produced a change in place of what the change does.
 
 Documents are hard wrapped at 81 columns, carry no trailing whitespace and no
-tab, and end with exactly one newline. That is enforced rather than preferred,
-and the width is the width this tree already wrapped at on the day the check
-landed.
+tab, and end with exactly one newline. A check enforces that, so it is not a
+preference, and the width is the width this tree already wrapped at on the day
+the check landed.
 
 Every tracked text file is stored with LF and decodes as UTF-8. `.gitattributes`
-declares it, and a check refuses a file that breaks the declaration rather than
-leaving the declaration to be believed.
+declares it, and a check refuses a file that breaks the declaration, so the
+declaration is read and not believed.
 
 A path written in backticks in a document has to exist, because a pointer to
 something renamed stays invisible until somebody follows it. Name no path you

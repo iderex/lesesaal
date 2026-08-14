@@ -6,15 +6,15 @@ run happened to demonstrate them. This is where they are collected, one entry
 per check: what the smallest change was that tripped it, the run where it was
 observed to red, and the failure it prevents.
 
-Every trip case here is a plausible mistake rather than an obviously broken
-input. A fixture that could not possibly have passed proves less than one that
-nearly did, so where a proof could be made to red for the wrong reason, the
-entry says which reason it was.
+Every trip case here is a mistake somebody plausibly makes, not an obviously
+broken input. A fixture that could not possibly have passed proves less than
+one that nearly did, so where a proof could be made to red for the wrong
+reason, the entry says which reason it was.
 
 ## The list this is measured against
 
-The checks are what the workflows declare, and the list is derived rather than
-remembered:
+The checks are what the workflows declare, and the list below is derived from
+them, never remembered:
 
     git grep -n '^    name:' -- .github/workflows/
     .github/workflows/branch-sweep.yml:74:    name: Sweep the default branch for a non-success run
@@ -44,12 +44,12 @@ on a pull request, the branch was opened as one, observed, and closed unmerged.
 ## Sweep the default branch for a non-success run
 
 Two runs, because this check has two verdicts and they are opposite states.
-Both were taken on the default branch rather than on a branch, which is the
-only place this check runs at all, so neither could be taken before it merged.
+Both were taken on the default branch, which is the only place this check runs
+at all, so neither could be taken before it merged.
 
 The trip case for the fail-closed leg is a branch name that does not exist,
 which is what a dispatch with a typed branch produces. The run list came back
-empty, and an empty run list is a branch this sweep did not judge rather than a
+empty, and an empty run list means a branch this sweep did not judge, not a
 branch with nothing wrong:
 
     https://github.com/iderex/lesesaal/actions/runs/31303480771/job/93219943491
@@ -62,7 +62,7 @@ from what it examines, and the next sweep picked it up and filed it:
 
     https://github.com/iderex/lesesaal/actions/runs/31303515962/job/93220032635
 
-That sweep concluded success, which is the design rather than a leniency. The
+That sweep concluded success, which is the design and not a leniency. The
 report is the issue it filed and not the run's own verdict, because a red
 default branch reported by reddening a run on the default branch would be as
 invisible as the thing it reports on. What the issue carried was the workflow
@@ -82,7 +82,7 @@ fires would leave every verdict above true and the check useless.
 
 The trip case is two commits, because there are two mistakes worth separating.
 A package that declares a variable and never uses it, which is a compile error
-in this language rather than a lint finding. And a file importing a package the
+in this language and not a lint finding. And a file importing a package the
 module file does not carry, which with resolution switched off is refused rather
 than quietly added.
 
@@ -145,10 +145,10 @@ pointer to something renamed, which is how a plan quietly stops being a plan.
 
 The trip case is one letter dropped from one word, in prose, in a document
 nobody would look at twice: `deliberately` written `deliberatly` in
-`docs/harness.md`. It is the mistake a person actually makes rather than a
-string no speller could accept, and it is in a sentence rather than in a code
-span, because the leg strips code before it judges a word and a proof placed
-there would have proved the stripping instead.
+`docs/harness.md`. It is the mistake a person actually makes, not a string no
+speller could accept, and it sits in a sentence and not in a code span,
+because the leg strips code before it judges a word and a proof placed there
+would have proved the stripping instead.
 
     https://github.com/iderex/lesesaal/actions/runs/31334351163/job/93297633867
 
@@ -180,8 +180,8 @@ proof contacts nothing outside this repository to make its point.
     https://github.com/iderex/lesesaal/actions/runs/31246822100/job/93076705953
 
 It prevents a document promising something at the other end of a link that is
-no longer there. It runs weekly rather than on a pull request, so it reports
-rather than blocks.
+no longer there. It runs on a weekly schedule and not on a pull request, so it
+reports and does not block.
 
 ## Formatting, vet and lint
 
@@ -240,8 +240,8 @@ wrong answer.
 
 ## Scorecard analysis
 
-No demonstrated refusal, and this entry is here rather than omitted because of
-it.
+No demonstrated refusal, and this entry stands here for that reason instead of
+being left out.
 
 It runs on a schedule, on a push to the default branch and on a change to the
 branch protection rule, and never on a pull request, so no branch can be made
@@ -402,6 +402,6 @@ rule that this file names every name the workflows declare is a candidate for
 it. Until then this record is kept level by the person adding the check, which
 is exactly the kind of rule this project marks as carried by nobody.
 
-The one thing that is derived rather than remembered is the list at the top,
+The one thing here that is derived and not remembered is the list at the top,
 which is pasted under the command that produces it, so a reader can run it and
 see the two disagree.

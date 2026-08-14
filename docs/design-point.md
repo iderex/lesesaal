@@ -219,8 +219,8 @@ and the assumed 5 answers are first exposed to people.
 
 ## What takes its numbers from here
 
-Five documents point at this one rather than carrying a number of their own,
-which is the arrangement this document exists to complete:
+Five documents point at this one and carry no number of their own, which is
+the arrangement completed here:
 
     git grep -c 'design point' -- docs/
     docs/deployment-ceiling.md:3

@@ -31,3 +31,9 @@ statement.
 nobody has time for. [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) says what is
 expected here and who receives a report. Both cover this repository and not a
 deployment somebody else runs.
+
+## License
+
+AGPL-3.0, copyright 2026 Nils Lehnen.
+
+The full text is in [LICENSE](LICENSE).

@@ -1,0 +1,32 @@
+# The shared hygiene rules, called rather than copied (#188).
+#
+# THIS BOARD HAD NO PULL REQUEST HYGIENE AT ALL. `doc-hygiene.yml` and
+# `text-hygiene.yml` next to this file judge tracked DOCUMENTS - markdown
+# formatting, dead links, the dictionary, spelling, line endings, UTF-8. Neither
+# reads a pull request body, a title or a commit subject. Of the twenty-one
+# boards in the fleet carrying a check called hygiene, this was the only one
+# where none of them was about a pull request, and the name is what hid it.
+#
+# NOTHING BESIDE THIS IS REPLACED. The two document checks cover eight things
+# the shared check has no equivalent for. This is addition.
+#
+# THE SUBJECT RULE IS OFF. Nineteen of the last twenty authored subjects here
+# name no issue at all, so switching it on today would refuse every pull
+# request. Off says the board does not meet that rule yet; not calling the check
+# would say nothing.
+#
+# PINNED BY HASH, NOT BY BRANCH. A moving reference would let the called
+# repository change what executes here without anybody reviewing the change.
+name: Shared hygiene
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    uses: iderex/wache/.github/workflows/pr-hygiene.yml@9b311243c2d0d0ced7feb957a20bc178acce6a5d # v1.0.0
+    with:
+      subject_names_issue: false

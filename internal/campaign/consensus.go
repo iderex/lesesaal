@@ -148,6 +148,11 @@ func (l Label) Rule() Rule { return l.rule }
 // were spread with nothing near the threshold is more often a broken image or a
 // question read two ways.
 //
+// The condition it reads is docs/consensus.md's and is narrower than a tie in
+// the counts: two options share the largest share and no other option the task
+// declares was named by anybody. levelAtTheTop is where that is computed and
+// where the reason for the narrowness is written.
+//
 // It is reported only where no label was derived. For a choice of several the
 // top share is regularly shared by options that all reach the threshold and all
 // enter the label, and calling that level would flag the campaign's healthiest
@@ -259,19 +264,24 @@ func set(answer Answer) map[string]bool {
 // the definition boundary should never have let through, and here it is an
 // answer that agreed with nothing.
 func single(task Task, shares []float64, label Label) Label {
-	top, level := highest(shares)
+	top, sharedTop := highest(shares)
 	if top == 0 {
 		// No answer named exactly one of the task's own options. There is no
 		// top to be level at, so this is spread rather than ambivalent.
 		return label
 	}
-	if !level && top >= label.rule.threshold {
+	if !sharedTop && top >= label.rule.threshold {
 		label.options = optionsAt(task, shares, top)
 		label.labelled = true
 		label.confidence = top
 		return label
 	}
-	label.level = level
+
+	// The condition that suppressed the label and the flag written beside it
+	// are two different tests, which docs/consensus.md states separately and
+	// this line keeps separate. Any largest share held by more than one option
+	// suppresses; only the narrower case is reported as level.
+	label.level = levelAtTheTop(shares)
 	return label
 }
 
@@ -309,8 +319,7 @@ func several(task Task, shares []float64, label Label) Label {
 		// answers that produced it may include one the boundary should have
 		// refused, and a rule assuming clean input is a rule with an undefined
 		// branch.
-		_, level := highest(shares)
-		label.level = level
+		label.level = levelAtTheTop(shares)
 		return label
 	}
 
@@ -320,15 +329,17 @@ func several(task Task, shares []float64, label Label) Label {
 	return label
 }
 
-// highest is the largest share and whether more than one option holds it.
+// highest is the largest share and whether more than one option holds it,
+// which is the condition docs/consensus.md suppresses a single choice label
+// under. It is not the flag: the flag is levelAtTheTop below and is narrower.
 //
 // The shares compared here are counts over one denominator, so two options
 // with the same count give the same float and the comparison needs no
 // tolerance. A tolerance would be the wrong instrument anyway: it would make
-// two options with different counts level at the top.
+// two options with different counts share the top.
 //
-// A top of zero is reported as not level however many options sit at it,
-// because options nobody named are not options the volunteers were level on.
+// A top of zero is reported as held by one option however many sit at it,
+// because options nobody named are not options anybody agreed on.
 func highest(shares []float64) (float64, bool) {
 	highest := 0.0
 	holders := 0
@@ -341,6 +352,45 @@ func highest(shares []float64) (float64, bool) {
 		}
 	}
 	return highest, holders > 1
+}
+
+// levelAtTheTop is the flag written beside a label, and it reads the condition
+// docs/consensus.md states for it: two options share the largest share and no
+// other option the task declares was named by anybody.
+//
+// It is narrower than the counts being tied, and the narrowness is the whole
+// of what #180 decided. The flag separates a subject the collection is
+// genuinely ambivalent about from a subject whose answers were spread, and
+// docs/retirement.md carries the two to the same place for different reasons.
+// The wide reading, any largest share held by more than one option, fires on
+// the most spread result a campaign can produce: three answers naming three
+// different options give every option a share of 0.33, so every option is
+// level at the top and complete disagreement carries the flag that exists to
+// mark ambivalence. The middle reading, the options at the top accounting for
+// every answer, fires on the same case, because three thirds also sum to one.
+//
+// An answer that named nothing the task declares, or that named two options of
+// a single choice, is in the denominator and supports no option, so it lowers
+// every share without adding an option to the top or to the others. Two
+// options level with such an answer beside them are still level: what the
+// condition asks is which options the volunteers named, not how many answers
+// were usable.
+func levelAtTheTop(shares []float64) bool {
+	top, _ := highest(shares)
+	if top == 0 {
+		return false
+	}
+
+	holders, others := 0, 0
+	for _, share := range shares {
+		switch {
+		case share == top:
+			holders++
+		case share > 0:
+			others++
+		}
+	}
+	return holders == 2 && others == 0
 }
 
 // optionsAt is the identifiers of the options holding the given share, in the

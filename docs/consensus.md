@@ -51,9 +51,9 @@ smallest agreeing count that reaches 0.7:
     7         5                         0.71
 
 At three answers, 0.7 is unanimity, because two of three is 0.67. That is a
-consequence worth stating in the campaign owner's guide, #113, rather than
-leaving it to be discovered from a campaign that produced fewer labels than
-expected.
+consequence worth stating in the campaign owner's guide rather than leaving it
+to be discovered from a campaign that produced fewer labels than expected, and
+`campaign-design.md` states it under #113.
 
 ## Why counting, and what the alternatives would have bought
 

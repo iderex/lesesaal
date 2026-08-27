@@ -273,3 +273,5 @@ no threshold of its own. #37 implements this rule, with the worked cases above
 as its table, and owes the proof that the same answers in any order produce the
 same label. #39 may estimate volunteer reliability for a campaign owner to look
 at, and until this document is reopened that estimate does not enter a label.
+`reliability.md` is what such an estimate would and would not measure, written
+before anything computes one.

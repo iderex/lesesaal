@@ -151,6 +151,6 @@ when a model that had earned it stops deserving it.
 
 The choice is a campaign setting made before the campaign opens, and every rule
 above is stated in the definition file the owner writes, which is
-`task-grammar.md`'s file. The guide in #113 explains the rules in the words of a
-campaign rather than of statistics, and it takes the four sentences above rather
-than writing a fifth version of them.
+`task-grammar.md`'s file. The guide in #113 is `campaign-design.md`. It explains
+the choice in the words of a campaign rather than of statistics, and it takes
+the four sentences above rather than writing a fifth version of them.

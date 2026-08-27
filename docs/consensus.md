@@ -9,8 +9,13 @@ campaign owner declares.
 
 For a single choice, each answer names one option. The label is the option named
 by the largest share of the answers, if that share reaches the campaign's
-agreement threshold. If no option reaches it, or if two options are level at the
-top, there is no label.
+agreement threshold. If no option reaches it, or if the largest share is held by
+more than one option, there is no label.
+
+That second condition is what suppresses a label. It is not the level-at-the-top
+flag, which is narrower and is defined once, below, under what the label carries
+beside itself. A subject can be left without a label by this condition and still
+carry the flag as off.
 
 For a choice of several, each answer is a set. It decomposes: for every option
 the task declares, an answer either contains it or does not, which
@@ -103,15 +108,34 @@ A single choice, level at the top, which is the tie:
     task t1, single choice over {clear, marked, unusable}
     answers   clear, marked, clear, marked
     counts    clear 2, marked 2, unusable 0
-    shares    clear 0.50, marked 0.50
-    level at the top, so no label. Recorded as a disagreement, answers 4
+    shares    clear 0.50, marked 0.50, unusable 0.00
+    two options hold the top and unusable was named by nobody, so no label and
+    level at the top is on. Recorded as a disagreement, answers 4
 
-A single choice, spread with no tie and no winner:
+A single choice, spread, with two options level at the top and a third named:
 
     task t1, single choice over {clear, marked, unusable}
     answers   clear, clear, marked, unusable, marked
     counts    clear 2, marked 2, unusable 1
-    top share 0.40 < 0.70, so no label. Recorded as a disagreement, answers 5
+    shares    clear 0.40, marked 0.40, unusable 0.20
+    0.40 < 0.70 and the top is shared, so no label. Level at the top is off,
+    because unusable was named. Recorded as a disagreement, answers 5
+
+The heading and the counts under it once disagreed about that last line, which
+is what #180 was opened on. They are made to agree here rather than in the code
+reading whichever of them a reader reached first.
+
+A single choice, three answers naming three different options:
+
+    task t1, single choice over {clear, marked, unusable}
+    answers   clear, marked, unusable
+    counts    clear 1, marked 1, unusable 1
+    shares    clear 0.33, marked 0.33, unusable 0.33
+    0.33 < 0.70 and the top is shared, so no label. Level at the top is off,
+    because three options hold the top. Recorded as a disagreement, answers 3
+
+That is the most spread result this task can produce, and it is the case the
+flag's condition was chosen against.
 
 A single choice with one answer only:
 
@@ -179,10 +203,34 @@ the time. A campaign owner may change the threshold mid-campaign, and a label
 computed under the old one has to be readable as such rather than silently
 compared with labels computed under the new one.
 
-Whether the answers were level at the top. A subject with no label because
-nobody agreed and a subject with no label because two options tied are different
-findings for a campaign owner, and `retirement.md` sends them to the same place
-for different reasons.
+Whether the answers were level at the top. This is the one place that condition
+is stated, and the condition is exact: the flag is on where two options hold the
+largest share and no other option the task declares was named by anybody. It is
+off everywhere else, including where three or more options hold the largest
+share, and including where two hold it with a third option named once.
+
+The narrowness is the point and it was decided in #180. A subject with no label
+because the answers divided between two readings and nothing else was seen is a
+subject the collection is genuinely ambivalent about, and it is usually the
+interesting one. A subject with no label because the answers were spread is more
+often a broken image, a bad scan or a question two volunteers read differently.
+`retirement.md` sends both to the same place for different reasons, so a flag
+that fired on both would tell a campaign owner nothing, which is what it exists
+to tell them.
+
+Two wider readings were rejected on the same case. Any largest share held by
+more than one option fires on three answers naming three different options,
+because every option then holds a share of 0.33; so does the reading where the
+options at the top account for every answer, because three thirds sum to one.
+Both would mark the most spread result a campaign can produce as ambivalence.
+The condition above refuses that case and is the only one of the three that
+agrees with every case worked by hand here.
+
+An answer naming nothing this task declares does not move the flag. It counts in
+the denominator and supports no option, so it lowers every share without putting
+an option at the top or beside it, and two options level with such an answer
+present are still level. What the condition asks is which options the volunteers
+named, not how many of the answers were usable.
 
 There is deliberately no fifth field carrying a probability that the label is
 correct. This rule does not produce one, and a share presented as a probability

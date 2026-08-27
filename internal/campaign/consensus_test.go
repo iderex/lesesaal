@@ -146,22 +146,26 @@ func TestTheSingleChoiceCasesWorkedInTheDocument(t *testing.T) {
 		Consensus(task, answers("clear", "clear", "marked", "clear", "clear"), rule),
 		true, []string{"clear"}, 0.80, 5, false)
 
-	// Level at the top, which the document calls the tie: clear 2, marked 2.
+	// Level at the top, which the document calls the tie: clear 2, marked 2,
+	// and unusable named by nobody.
 	check(t, "level at the top",
 		Consensus(task, answers("clear", "marked", "clear", "marked"), rule),
 		false, nil, 0, 4, true)
 
-	// Spread: clear 2, marked 2, unusable 1, top share 0.40.
-	//
-	// The document heads this case "spread with no tie and no winner" and its
-	// counts have two options level at 0.40, so the heading and the counts do
-	// not agree about the flag. What is asserted here is the rule the document
-	// states, which is the flag reading whether the answers were level at the
-	// top, and the counts underneath the heading are level. Which of the two
-	// the document means is not settled here and is #180.
+	// Spread: clear 2, marked 2, unusable 1, top share 0.40. Two options are
+	// level at 0.40 and a third was named, so the flag is off and the case is
+	// recorded as spread rather than as ambivalence, which is the condition
+	// the document now states in one place.
 	check(t, "spread",
 		Consensus(task, answers("clear", "clear", "marked", "unusable", "marked"), rule),
-		false, nil, 0, 5, true)
+		false, nil, 0, 5, false)
+
+	// Three answers naming three different options: every option at 0.33, so
+	// three options share the top and the flag is off. This is the case that
+	// decided which reading the flag means, and the document works it.
+	check(t, "complete disagreement",
+		Consensus(task, answers("clear", "marked", "unusable"), rule),
+		false, nil, 0, 3, false)
 
 	// One answer only: share 1.00, so a label at an input count of one.
 	check(t, "one answer",
@@ -222,6 +226,11 @@ func TestATieIsNeverLabelledEvenWhereBothOptionsReachTheThreshold(t *testing.T) 
 // TestCompleteDisagreementProducesNoLabel is the case the issue names beside
 // the tie. Every volunteer named a different option, so nothing is anywhere
 // near the threshold.
+//
+// It also holds the direction #180 decided the flag in. Three options share
+// the top and the answers account for the whole of it, so the two readings
+// this project rejected would both report the most spread result a campaign
+// can produce as ambivalence.
 func TestCompleteDisagreementProducesNoLabel(t *testing.T) {
 	got := Consensus(plateCondition(t), answers("clear", "marked", "unusable"), DefaultAgreement())
 	if got.Labelled() {
@@ -229,6 +238,59 @@ func TestCompleteDisagreementProducesNoLabel(t *testing.T) {
 	}
 	if got.Answers() != 3 {
 		t.Errorf("input count is %d, want 3", got.Answers())
+	}
+	if got.Level() {
+		t.Errorf("three options sharing the top were reported level at the top: %s", got)
+	}
+}
+
+// TestTheFlagReadsTwoOptionsAndNothingElseNamed is the condition #180 decided,
+// held here as a table rather than inside one worked case, because the two
+// readings it rejects each pass some of these rows and fail others.
+//
+// A reading of any largest share held by more than one option passes the first
+// row and the fourth and fails the second and the third. A reading of the
+// options at the top accounting for every answer passes the first three and
+// fails the third. Only the condition the document states passes all four.
+func TestTheFlagReadsTwoOptionsAndNothingElseNamed(t *testing.T) {
+	task := plateCondition(t)
+	rule := DefaultAgreement()
+
+	cases := []struct {
+		name    string
+		answers []Answer
+		level   bool
+	}{
+		{
+			"two options level and no third named",
+			answers("clear", "marked", "clear", "marked"),
+			true,
+		},
+		{
+			"two options level and a third named once",
+			answers("clear", "clear", "marked", "unusable", "marked"),
+			false,
+		},
+		{
+			"three options sharing the top",
+			answers("clear", "marked", "unusable"),
+			false,
+		},
+		{
+			"two options level beside an answer naming nothing declared",
+			answers("clear", "marked", "nowhere"),
+			true,
+		},
+	}
+
+	for _, c := range cases {
+		got := Consensus(task, c.answers, rule)
+		if got.Labelled() {
+			t.Fatalf("%s: produced a label, and every row here is a subject with none: %s", c.name, got)
+		}
+		if got.Level() != c.level {
+			t.Errorf("%s: level at the top is %v, want %v: %s", c.name, got.Level(), c.level, got)
+		}
 	}
 }
 

@@ -13,7 +13,9 @@
 // What is here so far is the dependencies the program takes rather than reads,
 // the campaign definition boundary, which is the types a campaign owner's
 // written definition becomes and the refusal of one that asks something this
-// project does not support, and the consensus rule, which is the answer, the
-// label and the count that turns a subject's answers into one. The rest of #32
-// is the subject and the classification, and #34 records one.
+// project does not support, the consensus rule, which is the answer, the label
+// and the count that turns a subject's answers into one, the campaign state
+// machine, which is what a transition does and which ones are refused, and the
+// retirement rule, which is when a subject has had enough classifications. The
+// rest of #32 is the subject and the classification, and #34 records one.
 package campaign

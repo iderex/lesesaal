@@ -8,6 +8,12 @@
 // harness_test.go refuses a departure from, so nothing here reaches the
 // program an operator runs.
 //
+// Beside the four it holds the fixtures a campaign is run from and the driver
+// that runs one: subjects with no bytes behind them, a campaign per task type
+// the grammar declares, volunteers as identifiers, and a sitting that plays a
+// whole campaign from the first answer to the last retirement in memory. #41 is
+// where that was asked for, and Sitting is where it is argued.
+//
 // Nothing here reads the runtime. The clock starts where the test puts it, the
 // draw is a fixture generator rather than a source of randomness, and the
 // dialler opens nothing. That is what makes a suite built on it the same suite

@@ -16,6 +16,8 @@
 // project does not support, the consensus rule, which is the answer, the label
 // and the count that turns a subject's answers into one, the campaign state
 // machine, which is what a transition does and which ones are refused, and the
-// retirement rule, which is when a subject has had enough classifications. The
-// rest of #32 is the subject and the classification, and #34 records one.
+// retirement rule, which is when a subject has had enough classifications, and
+// the subject record, which is the campaign owner's identifier, the metadata
+// they supplied unmodified and what ingest derived from the bytes. The
+// classification is what is left, and #34 records one.
 package campaign

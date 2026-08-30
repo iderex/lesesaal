@@ -18,6 +18,8 @@
 // machine, which is what a transition does and which ones are refused, and the
 // retirement rule, which is when a subject has had enough classifications, and
 // the subject record, which is the campaign owner's identifier, the metadata
-// they supplied unmodified and what ingest derived from the bytes. The
-// classification is what is left, and #34 records one.
+// they supplied unmodified and what ingest derived from the bytes, and the
+// handout, which is the draw over the eligible set and the hold that keeps two
+// volunteers asking at once from being given one subject. The classification is
+// what is left, and #34 records one.
 package campaign

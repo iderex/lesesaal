@@ -26,7 +26,7 @@ import (
 const (
 	SuggestedFloor            = 3
 	SuggestedCeiling          = 7
-	SuggestedEmptyAnswerFloor = 3
+	SuggestedEmptyAnswerFloor = 2
 )
 
 // Retirement is the rule in force for one campaign: which of the two base
@@ -114,12 +114,13 @@ func StopWhenTheyAgree(floor int, ceiling int) (Retirement, error) {
 // list of a different length is refused rather than matched up by position and
 // hoped for.
 //
-// THE SUGGESTED NUMBERS IN THAT DOCUMENT CANNOT BE USED TOGETHER, and this
-// function is where a campaign owner meets it. The rule calls this a smaller
-// floor, so a number level with the campaign's floor is refused here; the
-// suggested starting numbers are a floor of 3 and an empty answer floor of 3,
-// which are the same number and would retire nothing early. #192 holds both
-// halves of that question, this one and the model exit's.
+// WHAT SMALLER IS MEASURED AGAINST is the campaign's own floor, which is what
+// this exit sits on top of rather than replacing, so a number level with that
+// floor is refused here rather than accepted and left retiring nothing early.
+// docs/retirement.md says so in the rule itself now. It used to suggest a floor
+// of 3 and an empty answer floor of 3, which are the same number, so its own
+// starting numbers could not be declared together; #192 settled that and the
+// suggested empty answer floor above is what came out of it.
 func (r Retirement) StoppingEarlyOnTheEmptyAnswer(tasks int, options []string, floor int) (Retirement, error) {
 	if r.count != 0 {
 		return Retirement{}, fmt.Errorf("the empty answer exit reads whether a task has a label, and the fixed count rule does not consult agreement at all, so the two cannot be combined")
@@ -150,15 +151,15 @@ func (r Retirement) StoppingEarlyOnTheEmptyAnswer(tasks int, options []string, f
 // Decide: the model may only shorten a subject whose volunteers already agree,
 // so a proposal never breaks a tie and never rescues a disagreement.
 //
-// WHICH FLOOR THE REDUCED ONE IS MEASURED AGAINST IS TWO SENTENCES IN THAT
-// DOCUMENT AND THEY DO NOT AGREE. The rule calls the number a reduced floor,
-// which is a number below the campaign's floor. The section on consulting the
-// model says there is an absolute floor no model may retire below and that it
-// is the campaign's own floor, which is that same number and leaves nothing to
-// reduce. What is implemented here is the first, because the second read
-// literally makes the whole rule incapable of firing, and #192 is where that
-// is settled rather than being decided by this file. That issue carries the
-// same question about the empty answer floor above.
+// WHICH FLOOR THE REDUCED ONE IS MEASURED AGAINST is the campaign's own floor,
+// which is what this exit sits on top of rather than replacing. Two sentences
+// in that document disagreed about it: the rule called the number a reduced
+// floor, and the section on consulting the model called the absolute floor the
+// campaign's own floor, which is the number being reduced and leaves nothing to
+// reduce. #192 settled it in the direction this function already implemented,
+// because the other reading describes an exit that can never fire. The absolute
+// floor in that section is now the reduced floor the campaign declared, bounded
+// below by 1 for the reason the first refusal below gives.
 func (r Retirement) LettingTheModelShorten(floor int) (Retirement, error) {
 	if r.count != 0 {
 		return Retirement{}, fmt.Errorf("the model exit reads the label the volunteers produced, and the fixed count rule does not consult agreement at all, so the two cannot be combined")

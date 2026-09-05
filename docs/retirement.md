@@ -40,24 +40,42 @@ need it.
 Stop early when enough volunteers say there is nothing here. The campaign owner
 names one option per task as the empty answer, and a subject whose empty answer
 reaches a label with a smaller floor retires there. Its own number is that
-smaller floor. The agreement it requires is `consensus.md`'s, unchanged. It is
-for a collection where most plates carry nothing of interest, which is the
-common case in an archive sweep and is where a campaign's time is otherwise
-spent confirming absences.
+smaller floor, and smaller is measured against the campaign's own floor above:
+this exit sits on the agreement rule rather than replacing it, so the number it
+reduces is that rule's floor and it has to be strictly below it. The agreement
+it requires is `consensus.md`'s, unchanged. It is for a collection where most
+plates carry nothing of interest, which is the common case in an archive sweep
+and is where a campaign's time is otherwise spent confirming absences.
 
 Let the model shorten the easy ones. On top of the default rule, a subject whose
 model proposal agrees with the label already derived from the volunteers may
-retire at a reduced floor. Its own number is that reduced floor, which may never
-go below the absolute floor in the next section. It is off unless a campaign
-owner switches it on, and the section after next says why.
+retire at a reduced floor. Its own number is that reduced floor, and reduced is
+measured against the same number the exit above is: the campaign's own floor,
+which this exit also sits on top of rather than replacing, and which the reduced
+floor has to be strictly below. It is off unless a campaign owner switches it
+on, and the section after next says why.
 
 The suggested starting numbers are a floor of 3, a ceiling of 7 and an empty
-answer floor of 3. At the default agreement threshold of 0.7, a floor of 3 means
+answer floor of 2. At the default agreement threshold of 0.7, a floor of 3 means
 the first three volunteers were unanimous, and a ceiling of 7 means a subject
 that has not settled by the fifth agreeing answer out of seven is not going to.
-The design point assumes 5 classifications per subject on average, which sits
-inside that range, and all of these are starting positions rather than results:
-the pilot in #116 is what moves them.
+An empty answer floor of 2 is two volunteers who both said there is nothing
+here, which is also unanimity at that threshold, and it is one answer of
+evidence rather than two. The design point assumes 5 classifications per subject
+on average, which sits inside that range, and all of these are starting
+positions rather than results: the pilot in #116 is what moves them.
+
+There is no suggested number for the model exit, because it is off by default
+and a campaign owner switching it on is choosing what the model is allowed to
+save them. What the arithmetic leaves them to choose from is worth reading
+before they do. Both reduced floors are at least 1 and strictly below the
+campaign's floor, so at the suggested floor of 3 the model exit has two legal
+values. A reduced floor of 2 saves one answer per subject the model agrees with.
+A reduced floor of 1 retires a subject on a single volunteer's answer that the
+model happened to match, and the label such a subject carries has one person
+behind it. A campaign owner who wants the model exit to save more than one
+answer without descending to that raises the campaign's floor first, rather than
+lowering the reduced floor to where a label stops meaning much.
 
 ## Where a subject goes when it cannot reach agreement
 
@@ -123,12 +141,25 @@ account of the evidence behind it, and what the model changed is how much
 evidence was collected rather than what it says.
 
 Three constraints hold it there. There is an absolute floor of classifications
-below which no model may retire a subject, and it is the campaign's own floor
-rather than a number this rule invents. The model may only shorten a subject
-whose humans already agree, so a proposal never breaks a tie and never rescues a
-disagreement. And every subject retired this way is marked as such in the
-export, so a downstream reader can drop them and re-derive the campaign as if
-the model had not been there.
+below which no model may retire a subject, and it is the reduced floor the
+campaign declared rather than a number this rule or the model invents: the
+campaign owner says how far the model is allowed to shorten a subject, before
+any model has proposed anything, and no run moves that number. That floor is
+itself bounded on both sides, strictly below the campaign's floor because a
+number level with it shortens nothing, and never below 1 because a subject
+retired before any volunteer answered would carry a label with no human behind
+it at all. The model may only shorten a subject whose humans already agree, so a
+proposal never breaks a tie and never rescues a disagreement. And every subject
+retired this way is marked as such in the export, so a downstream reader can
+drop them and re-derive the campaign as if the model had not been there.
+
+An earlier version of the paragraph above said the absolute floor was the
+campaign's own floor. Read literally that is the number the reduced floor
+reduces, so the exit could never fire, and this section and the rule above it
+disagreed about the same number. #192 is where that was settled, in the
+direction that leaves the rule able to fire, because the alternative reading
+describes a setting a campaign owner can switch on and never observe doing
+anything.
 
 It is off by default because a campaign whose first release produces a mixed
 corpus, some subjects with five human answers and some with two, is harder to

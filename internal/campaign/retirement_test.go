@@ -54,7 +54,7 @@ func TestEachRuleInTheVocabularyRecordsWhatFired(t *testing.T) {
 		t.Fatalf("a fixed count of 5 was refused: %v", err)
 	}
 
-	empty, err := agreementRule(t).StoppingEarlyOnTheEmptyAnswer(1, []string{"nothing"}, SuggestedEmptyAnswerFloor-1)
+	empty, err := agreementRule(t).StoppingEarlyOnTheEmptyAnswer(1, []string{"nothing"}, SuggestedEmptyAnswerFloor)
 	if err != nil {
 		t.Fatalf("the empty answer exit was refused: %v", err)
 	}
@@ -376,26 +376,37 @@ func TestTheNumbersEachConstructorRefuses(t *testing.T) {
 	}
 }
 
-// TestTheSuggestedNumbersForTheTwoExitsAreRefusedBesideTheSuggestedFloor is a
-// finding held as a test rather than as a sentence somewhere. Both exits take
-// a floor the rule calls smaller or reduced, so both are refused at a number
-// level with the campaign's floor. docs/retirement.md suggests a floor of 3
-// and an empty answer floor of 3, which are the same number, so its own
-// starting numbers cannot be declared together and the exit they describe
-// would retire nothing early. #192 is where that is settled, and this case
-// exists so the state is in the suite rather than only in a comment.
-func TestTheSuggestedNumbersForTheTwoExitsAreRefusedBesideTheSuggestedFloor(t *testing.T) {
-	rule := agreementRule(t)
-
-	if _, err := rule.StoppingEarlyOnTheEmptyAnswer(1, []string{"nothing"}, SuggestedEmptyAnswerFloor); err == nil {
-		t.Fatalf("the suggested empty answer floor of %d was admitted beside the suggested floor of %d", SuggestedEmptyAnswerFloor, SuggestedFloor)
+// TestTheSuggestedNumbersCanAllBeDeclaredTogether holds what #192 settled.
+// Both exits take a floor the rule calls smaller or reduced, and both are
+// measured against the campaign's own floor, so both are refused at a number
+// level with it, which TestTheNumbersEachConstructorRefuses holds. The
+// consequence for the numbers docs/retirement.md offers a campaign owner is
+// this case: a document that suggests a floor of 3 and an empty answer floor
+// of 3 suggests a pair that cannot be declared, and the campaign owner who
+// types both meets the refusal rather than the suggestion. It used to suggest
+// exactly that.
+//
+// This is a test rather than a sentence in the document because the two
+// numbers live in this file and the suggestion lives in that one, so nothing
+// but a case that declares them together notices when they part again.
+func TestTheSuggestedNumbersCanAllBeDeclaredTogether(t *testing.T) {
+	rule, err := StopWhenTheyAgree(SuggestedFloor, SuggestedCeiling)
+	if err != nil {
+		t.Fatalf("the suggested floor of %d and ceiling of %d were refused: %v", SuggestedFloor, SuggestedCeiling, err)
 	}
 
-	// One below it is what a campaign owner has to declare instead, and it is
-	// admitted, so the refusal above is about the number rather than about the
-	// exit being unavailable.
-	if _, err := rule.StoppingEarlyOnTheEmptyAnswer(1, []string{"nothing"}, SuggestedEmptyAnswerFloor-1); err != nil {
-		t.Errorf("an empty answer floor one below the campaign's floor was refused: %v", err)
+	if _, err := rule.StoppingEarlyOnTheEmptyAnswer(1, []string{"nothing"}, SuggestedEmptyAnswerFloor); err != nil {
+		t.Errorf("the suggested empty answer floor of %d was refused beside the suggested floor of %d: %v", SuggestedEmptyAnswerFloor, SuggestedFloor, err)
+	}
+
+	// The bounds the suggestion has to sit inside, asserted rather than
+	// inferred from the refusal above, so a reader of this case knows which
+	// two numbers moving would break it.
+	if SuggestedEmptyAnswerFloor < 1 {
+		t.Errorf("the suggested empty answer floor of %d is not a number of classifications", SuggestedEmptyAnswerFloor)
+	}
+	if SuggestedEmptyAnswerFloor >= SuggestedFloor {
+		t.Errorf("the suggested empty answer floor of %d is not below the suggested floor of %d, so it would retire nothing early", SuggestedEmptyAnswerFloor, SuggestedFloor)
 	}
 }
 

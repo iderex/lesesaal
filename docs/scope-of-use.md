@@ -57,9 +57,9 @@ would never know.
 Saying otherwise would be the kind of claim this project does not make. A
 statement is not a mechanism, and this one is a statement.
 
-What it does do is set what the maintainers will help with. A feature request
-that only makes sense for one of the uses above is refused with a pointer at this
-document, and that is the whole of its force.
+What it does do is set what I will help with. A feature request that only makes
+sense for one of the uses above is refused with a pointer at this document, and
+that is the whole of its force.
 
 ## Why this is not a licence restriction
 

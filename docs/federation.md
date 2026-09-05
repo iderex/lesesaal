@@ -23,9 +23,9 @@ responsibility and belongs in the operator's data protection documentation, #105
 Publishing a campaign's results somewhere central. What travels is the export.
 Whether that carries personal data is not decided here and this document does not
 assume it: it depends on what an export says about a volunteer, which is entry 3
-of #1 and belongs to the maintainer. Until that entry is answered, this mode is
-marked as carrying personal data, because the safe reading of an undecided
-question is the one that does not quietly widen what may leave the host.
+of #1 and is mine to answer. Until that entry is answered, this mode is marked
+as carrying personal data, because the safe reading of an undecided question is
+the one that does not quietly widen what may leave the host.
 
 Sharing a trained model. What travels is the weights and whatever the model
 integration records alongside them. Whether a model derived from volunteer labels

@@ -90,8 +90,8 @@ Python is the answer that wins the model requirement outright and loses the
 first one. An operator would maintain an interpreter and an environment, the
 image is larger by an order of magnitude, and the dependency graph is the
 hardest of the candidates to lock and reproduce exactly. For a project whose
-product is that a working group can run this without becoming its maintainer,
-that is the wrong trade.
+product is that a working group can run this without having to look after the
+software as well, that is the wrong trade.
 
 A runtime-based platform with a self-contained publish sits between the two. It
 would satisfy the deployment requirement and has a strong test story, its model

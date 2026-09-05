@@ -114,5 +114,5 @@ though the rule enforces itself.
 ## What this does not settle
 
 Whether the branch should refuse a merge on this check. That argument belongs to
-`docs/required-checks.md`, which is a request to the maintainer rather than a
-setting, and this change does not add the name to it.
+`docs/required-checks.md`, which is a request to me rather than a setting, and
+this change does not add the name to it.

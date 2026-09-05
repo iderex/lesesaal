@@ -46,8 +46,8 @@ else's deployment.
 
 ## Reporting
 
-Reports go to Nils Lehnen, the maintainer, at the address published on that
-account, which is the same person who merges everything here:
+Reports come to me, Nils Lehnen, at the address published on that account,
+which is also the account that merges everything here:
 
     $ gh api users/iderex --jq '{name, email}'
     {"email":"nils.lehnen@proton.me","name":"Nils Lehnen"}
@@ -56,13 +56,13 @@ Write what happened, where, and what you want to happen. A link to the comment
 or the pull request is enough for the where. You do not have to be the person
 it happened to.
 
-What the maintainer does, in order. Acknowledges that the report arrived. Reads
-what is linked and asks the reporter anything that is missing. Decides whether
-this document was broken, and says so to the reporter either way. Then acts,
-which is one of: nothing, with the reason; asking for an edit; hiding or
-deleting a comment; blocking the account from this repository. Which one was
-chosen is told to the reporter and, where a comment visibly changed, is
-recorded in that thread rather than silently.
+What I do, in order. I acknowledge that the report arrived. I read what is
+linked and ask the reporter anything that is missing. I decide whether this
+document was broken, and say so to the reporter either way. Then I act, which
+is one of: nothing, with the reason; asking for an edit; hiding or deleting a
+comment; blocking the account from this repository. Which one was chosen is
+told to the reporter and, where a comment visibly changed, is recorded in that
+thread rather than silently.
 
 A report is not made public and the reporter is not named without their
 agreement. There is no promised time here, unlike `SECURITY.md`, which promises
@@ -71,23 +71,23 @@ some and says nothing enforces them.
 ## The gap in that route, stated rather than hidden
 
 One person receives reports and that person is also the only one who can act.
-A report about the maintainer therefore goes to the maintainer, and no route
-inside this repository fixes that.
+A report about me therefore comes to me, and no route inside this repository
+fixes that.
 
 What exists instead is outside this project: GitHub's own abuse reporting,
-which reaches somebody who is not the maintainer and can act on an account
-regardless of what any repository says. That is the escalation, it is a weaker
-answer than a second person would be, and it is the honest one until there is a
-second person. `GOVERNANCE.md` is where the single-maintainer position and what
-it costs are recorded.
+which reaches somebody other than me and can act on an account regardless of
+what any repository says. That is the escalation, it is a weaker answer than a
+second person would be, and it is the honest one until there is a second
+person. `GOVERNANCE.md` is where the one-person position and what it costs are
+recorded.
 
 ## This repository is not a deployment's community
 
 This project is self-hosted. Somebody running a campaign has volunteers, and
 those volunteers are in that campaign owner's community rather than in this
-one. This document does not reach them, the maintainer here has no view of
-their deployment and no way to act inside it, and pretending otherwise would
-offer a protection that does not exist.
+one. This document does not reach them, I have no view of their deployment and
+no way to act inside it, and pretending otherwise would offer a protection that
+does not exist.
 
 A campaign owner asking volunteers for their time takes on that responsibility
 themselves, including what a volunteer is told before they start, which is
@@ -97,5 +97,5 @@ Nothing in the software decides any of it.
 ## Enforcement
 
 Nothing in this repository reads this file. There is no check that judges a
-comment and none is possible, so what stands behind this document is the
-maintainer acting on it and the account-level route named above.
+comment and none is possible, so what stands behind this document is me acting
+on it and the account-level route named above.

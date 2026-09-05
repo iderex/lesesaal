@@ -166,7 +166,7 @@ plan assumes today.
 
 Whether audio, video, one dimensional spectra or free text subjects are a first
 release promise is not settled here and is not assumed either way. It is entry 7
-of #1, it belongs to the maintainer, and it is the only thing that reopens this
+of #1, it is mine to answer, and it is the only thing that reopens this
 document. A widening decided there is a change to this file, not a type added
 beside it.
 

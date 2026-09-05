@@ -20,6 +20,12 @@
 // the subject record, which is the campaign owner's identifier, the metadata
 // they supplied unmodified and what ingest derived from the bytes, and the
 // handout, which is the draw over the eligible set and the hold that keeps two
-// volunteers asking at once from being given one subject. The classification is
-// what is left, and #34 records one.
+// volunteers asking at once from being given one subject, and the write path,
+// which is what one volunteer submits about one subject and the rule that makes
+// a repeated submission one classification rather than two.
+//
+// What the write path here does not hold is the store behind it. The write
+// itself is a function the caller supplies, so this package holds the order the
+// steps happen in and the decision about what a second arrival means without
+// knowing what is written to. #33 chooses the store.
 package campaign

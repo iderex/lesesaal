@@ -2,6 +2,7 @@ package campaign
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
@@ -29,6 +30,24 @@ type Pool struct {
 	// than of the subject, and docs/subject-selection.md names it as the first
 	// thing to give at a hundred times the design point.
 	Answered map[string]bool
+
+	// Uncertainty is how unsure the model is about a subject, higher meaning
+	// less certain, for the subjects it has scored. It is the number #55
+	// supplies and this rule does not compute or interpret it: what it does
+	// with it is cut a share off the top, so any scale works as long as one
+	// campaign uses one of them.
+	//
+	// A subject absent from this map is one the model has not scored, which is
+	// every subject before the first model and every subject added since the
+	// last training run. It stays fully available on the uniform draw and is
+	// never in the uncertain share, because a subject with no score is not a
+	// subject the model is uncertain about. #60 is where that second cold
+	// start is held.
+	//
+	// An empty or absent map is the model having no opinion at all, and
+	// docs/subject-selection.md answers that case by name: every draw is the
+	// uniform one.
+	Uncertainty map[string]float64
 }
 
 // Reason is why a volunteer asking for work was given none.
@@ -91,6 +110,61 @@ func (h Handout) Volunteer() string { return h.volunteer }
 // stamping it and the caller reading it are not always the same one.
 func (h Handout) Until() time.Time { return h.until }
 
+// DefaultOneDrawIn is the proportion docs/subject-selection.md fixes: one draw
+// in four is taken from the share of the eligible set the model is least
+// certain about, and three in four are taken from the whole of it.
+//
+// That document says the mixture is ONE number and then uses the number twice,
+// once for how often the model is consulted and once for how big the share it
+// is consulted about is - one draw in four, and the quarter. This reads it as
+// one setting rather than two, so a campaign that moves the proportion moves
+// both together. Where they should part, that is a change to that document and
+// not a second number added here.
+const DefaultOneDrawIn = 4
+
+// Mixture is how often the draw consults the model, and how much of the
+// eligible set it consults it about.
+//
+// It is a setting with the document's proportion as its default rather than a
+// constant, which is what #56 asks for: the number is a starting position and
+// the pilot in #115 and #116 is what moves it, so an operator changing it
+// should not be changing code.
+type Mixture struct {
+	// oneDrawIn is n in "one draw in n". It is unexported so that the only way
+	// to hold a Mixture that is not the zero value is to have been through a
+	// constructor that refused the numbers that mean nothing.
+	oneDrawIn int
+}
+
+// DefaultMixture is the proportion docs/subject-selection.md fixes.
+func DefaultMixture() Mixture { return Mixture{oneDrawIn: DefaultOneDrawIn} }
+
+// OneDrawIn is the mixture that consults the model on one draw in n, over the
+// 1/n of the eligible set it is least certain about.
+//
+// A n of 1 is refused rather than read as ordering by uncertainty. Every draw
+// would come from the whole eligible set sorted by uncertainty, which is the
+// ordering docs/subject-selection.md rejects by name: it hands the single
+// hardest subject to everybody who asks, and an operator who typed 1 meaning
+// "always consult the model" would get that without being told.
+func OneDrawIn(n int) (Mixture, error) {
+	if n < 2 {
+		return Mixture{}, Refused{Refusals: []Refusal{{
+			Says: fmt.Sprintf("a mixture of one draw in %d is not a mixture: every draw would come from the share the model is least certain about, which is the ordering docs/subject-selection.md rejects because it hands the hardest subject to everybody at once", n),
+		}}}
+	}
+	return Mixture{oneDrawIn: n}, nil
+}
+
+// OneDrawIn is n in "one draw in n".
+func (m Mixture) OneDrawIn() int { return m.oneDrawIn }
+
+// String writes the mixture the way the configuration prints it, so an operator
+// reads the proportion rather than a struct.
+func (m Mixture) String() string {
+	return fmt.Sprintf("1 draw in %d over the least certain 1/%d", m.oneDrawIn, m.oneDrawIn)
+}
+
 // Handouts is the holds of one campaign: which subjects are out with which
 // volunteers and until when.
 //
@@ -136,6 +210,12 @@ type Handouts struct {
 	// hold is how long a subject stays out with the volunteer it was given to.
 	hold time.Duration
 
+	// mixture is how often the draw consults the model. It is fixed for the
+	// life of a campaign's handouts rather than passed per draw, because a
+	// proportion that moved between two volunteers asking in the same minute
+	// would make a campaign unreplayable.
+	mixture Mixture
+
 	// held is subject identifier to hold. Only subjects that are out are in
 	// it, so its size is the number of volunteers working rather than the
 	// number of subjects in the campaign.
@@ -157,12 +237,31 @@ type held struct {
 // an operator who wants that has asked for something this project will not do
 // silently.
 func KeepHoldsFor(hold time.Duration) (*Handouts, error) {
+	return KeepHoldsForDrawing(hold, DefaultMixture())
+}
+
+// KeepHoldsForDrawing is the same with the mixture named, for a campaign whose
+// owner moved the proportion off the document's default.
+func KeepHoldsForDrawing(hold time.Duration, mixture Mixture) (*Handouts, error) {
 	if hold <= 0 {
 		return nil, Refused{Refusals: []Refusal{{
 			Says: fmt.Sprintf("a hold of %s keeps nothing: the subject would be eligible again before the volunteer it was given to had seen it, and every volunteer asking at once would be handed the same one", hold),
 		}}}
 	}
-	return &Handouts{hold: hold, held: map[string]held{}}, nil
+	if mixture.oneDrawIn < 2 {
+		return nil, Refused{Refusals: []Refusal{{
+			Says: fmt.Sprintf("a mixture of one draw in %d was not built by OneDrawIn, and the zero value would consult the model on every draw or on none depending on which branch read it first", mixture.oneDrawIn),
+		}}}
+	}
+	return &Handouts{hold: hold, mixture: mixture, held: map[string]held{}}, nil
+}
+
+// Mixture is the proportion this campaign draws at, which is what the
+// configuration prints for an operator.
+func (h *Handouts) Mixture() Mixture {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.mixture
 }
 
 // Next gives one volunteer one subject and holds it for them, or says why there
@@ -213,17 +312,98 @@ func (h *Handouts) Next(volunteer string, pool Pool, now time.Time, draw func(n 
 		return Handout{}, nothingFor(answeredSomething, blocked, soonest, now)
 	}
 
-	at := draw(len(eligible))
-	if at < 0 || at >= len(eligible) {
+	from, err := h.lane(eligible, pool, draw)
+	if err != nil {
+		return Handout{}, err
+	}
+
+	at := draw(len(from))
+	if at < 0 || at >= len(from) {
 		return Handout{}, Refused{Refusals: []Refusal{{
-			Says: fmt.Sprintf("the draw returned %d for an eligible set of %d, which is outside the interval Depends.Intn declares, so no subject was handed out rather than one being chosen by whatever the number happened to reach", at, len(eligible)),
+			Says: fmt.Sprintf("the draw returned %d for a set of %d, which is outside the interval Depends.Intn declares, so no subject was handed out rather than one being chosen by whatever the number happened to reach", at, len(from)),
 		}}}
 	}
 
-	chosen := eligible[at]
+	chosen := from[at]
 	until := now.Add(h.hold)
 	h.held[chosen.ID()] = held{volunteer: volunteer, until: until}
 	return Handout{subject: chosen, volunteer: volunteer, until: until}, nil
+}
+
+// lane is the set this draw is taken from: the whole eligible set, or the share
+// of it the model is least certain about.
+//
+// This is the mixture docs/subject-selection.md decided, and the two parts that
+// defuse uncertainty ordering are both here. Which lane is used is decided by a
+// draw rather than by a counter, so ten volunteers asking in the same minute do
+// not all take the uncertain one; and the draw INSIDE the uncertain lane is
+// uniform rather than ordered, so ten volunteers who do take it land on ten
+// different subjects instead of ten looks at the single hardest image.
+//
+// The caller holds the lock.
+func (h *Handouts) lane(eligible []Subject, pool Pool, draw func(n int) int) ([]Subject, error) {
+	if len(pool.Uncertainty) == 0 {
+		return eligible, nil
+	}
+
+	which := draw(h.mixture.oneDrawIn)
+	if which < 0 || which >= h.mixture.oneDrawIn {
+		return nil, Refused{Refusals: []Refusal{{
+			Says: fmt.Sprintf("the draw returned %d for a mixture of one in %d, which is outside the interval Depends.Intn declares, so no subject was handed out rather than the lane being chosen by whatever the number happened to reach", which, h.mixture.oneDrawIn),
+		}}}
+	}
+	if which != 0 {
+		return eligible, nil
+	}
+
+	uncertain := leastCertain(eligible, pool.Uncertainty, h.mixture.oneDrawIn)
+	if len(uncertain) == 0 {
+		// Every eligible subject is one the model has not scored, which is the
+		// second cold start in #60 and is answered the same way as the first:
+		// the share is undefined and this draw is the uniform one.
+		return eligible, nil
+	}
+	return uncertain, nil
+}
+
+// leastCertain is the 1/share of the SCORED eligible subjects the model is
+// least sure about, which is at least one where any subject is scored at all.
+//
+// It cuts the share from the scored subjects rather than from the whole
+// eligible set, and that is a reading of docs/subject-selection.md rather than
+// a sentence in it. The alternative, treating an unscored subject as maximally
+// uncertain, would fill the uncertain lane with whatever was ingested most
+// recently and never with what the model actually struggled on.
+//
+// The order is by uncertainty and then by identifier, so a campaign replayed
+// from the same pool cuts the same share. Sorting by a float alone leaves
+// subjects at equal uncertainty in whatever order the eligible set arrived in,
+// which is stable here and would stop being stable the first time a caller
+// built the pool from a map.
+func leastCertain(eligible []Subject, uncertainty map[string]float64, share int) []Subject {
+	scored := make([]Subject, 0, len(eligible))
+	for _, subject := range eligible {
+		if _, has := uncertainty[subject.ID()]; has {
+			scored = append(scored, subject)
+		}
+	}
+	if len(scored) == 0 {
+		return nil
+	}
+
+	sort.SliceStable(scored, func(i, j int) bool {
+		left, right := uncertainty[scored[i].ID()], uncertainty[scored[j].ID()]
+		if left == right {
+			return scored[i].ID() < scored[j].ID()
+		}
+		return left > right
+	})
+
+	cut := len(scored) / share
+	if cut < 1 {
+		cut = 1
+	}
+	return scored[:cut]
 }
 
 // holding is the subject this volunteer is already holding, where they are

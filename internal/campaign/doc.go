@@ -20,7 +20,8 @@
 // the subject record, which is the campaign owner's identifier, the metadata
 // they supplied unmodified and what ingest derived from the bytes, and the
 // handout, which is the draw over the eligible set and the hold that keeps two
-// volunteers asking at once from being given one subject, and the write path,
+// volunteers asking at once from being given one subject, including the mixture
+// that decides how often the draw consults the model, and the write path,
 // which is what one volunteer submits about one subject and the rule that makes
 // a repeated submission one classification rather than two.
 //

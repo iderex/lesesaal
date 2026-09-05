@@ -7,8 +7,8 @@ that does not exist would be worse than none.
 
 ## Who decides
 
-One maintainer, Nils Lehnen, who is the only person who has committed to this
-repository and the only person who has opened anything on it:
+Me, Nils Lehnen, the only person who has committed to this repository and the
+only person who has opened anything on it:
 
     $ gh api repos/iderex/lesesaal/contributors --jq '[.[].login] | join(" ")'
     iderex
@@ -17,12 +17,12 @@ repository and the only person who has opened anything on it:
     $ gh api --paginate "repos/iderex/lesesaal/issues?state=all&per_page=100" --jq '.[].user.login' | wc -l
     159
 
-A single maintainer is a legitimate answer and it is this project's answer
-today. What it costs is worth stating rather than leaving to be discovered.
-There is no second person who can merge, so work stops when the maintainer
-stops. There is no appeal from a decision to anybody but the person who made
-it. And a disagreement about direction is settled by one reading of
-`docs/design-point.md` and `docs/scope-of-use.md` rather than by a vote.
+One person is a legitimate answer and it is this project's answer today. What
+it costs is worth stating rather than leaving to be discovered. There is no
+second person who can merge, so work stops when I stop. There is no appeal from
+a decision to anybody but the person who made it. And a disagreement about
+direction is settled by one reading of `docs/design-point.md` and
+`docs/scope-of-use.md` rather than by a vote.
 
 That changes when somebody else is doing enough of the work that the sentence
 above stops being true, and the change is itself a decision recorded the way
@@ -42,8 +42,8 @@ A decision that shapes how the software is built then becomes a document under
 is why `docs/consensus.md` and `docs/federation.md` read as statements rather
 than as arguments: the argument is on the issue that produced them.
 
-Decisions reserved to the maintainer are parked in one place rather than
-assumed in the issues they block, and issue #1 is that place. An entry there is
+Decisions I keep for myself are parked in one place rather than assumed in the
+issues they block, and issue #1 is that place. An entry there is
 answered by a comment naming the option chosen. An issue blocked on one names
 the entry it waits for and stops.
 
@@ -54,7 +54,7 @@ templates under `.github/ISSUE_TEMPLATE/` ask for that shape directly. A change
 with no issue has nowhere to record why it exists.
 
 Then a pull request against `main`, with the evidence the body asks for. Direct
-pushes are refused by the branch ruleset, for the maintainer as well:
+pushes are refused by the branch ruleset, for me as well:
 
     $ gh api repos/iderex/lesesaal/rulesets/20520725 --template '{{.enforcement}} bypass={{len .bypass_actors}} types={{range .rules}}{{.type}} {{end}}'
     active bypass=0 types=deletion non_fast_forward pull_request
@@ -101,6 +101,6 @@ Conduct. `CODE_OF_CONDUCT.md` is that, including who receives a report.
 Anything about a deployment somebody else runs. This governs the repository.
 
 Enforcement. No check reads this file, nothing refuses a change that departs
-from it, and it is carried by the maintainer following it. The three rules this
+from it, and it is carried by my following it. The three rules this
 project measures itself by are in `CONTRIBUTING.md`, and where one of them has
 no mechanism behind it, the document saying so is the whole of the guarantee.

@@ -1,7 +1,7 @@
 # Commit signing on the protected branch
 
 Requested in issue #100. This document is the request rather than the change:
-only the maintainer can edit a ruleset, and nothing here does it.
+only I can edit a ruleset, and nothing here does it.
 
 ## The setting
 
@@ -63,13 +63,13 @@ refused, which is the end of the line and the most expensive place to learn
 anything. That is why the contribution guide has to carry it before the rule
 lands rather than after, and #29 is where that sentence belongs.
 
-Nobody here can repair a fork's history for them. A maintainer with write access
-to this repository has no write access to the branch the change came from, so the
+Nobody here can repair a fork's history for them. Write access to this
+repository is no write access to the branch the change came from, so the
 rewrite below is work the contributor has to do, on a change they have already
 finished once.
 
 Nobody can wave it through either, and that is deliberate. The bypass list is
-empty, so the rule applies to the maintainer's own branches on the same terms.
+empty, so the rule applies to my own branches on the same terms.
 
 ## A branch carrying one unsigned commit
 

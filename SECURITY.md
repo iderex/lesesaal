@@ -11,9 +11,9 @@ about the repository rather than a claim about intent:
     $ gh api repos/iderex/lesesaal/private-vulnerability-reporting
     {"enabled":true}
 
-That route opens a draft advisory only the reporter and the maintainer can read,
-it carries attachments, and it becomes the published advisory later without
-anything being copied between places.
+That route opens a draft advisory only the reporter and I can read, it carries
+attachments, and it becomes the published advisory later without anything being
+copied between places.
 
 Do not open a public issue for a suspected vulnerability, and do not put the
 detail in a pull request. A public issue is readable by everybody the moment it
@@ -105,7 +105,7 @@ process on one machine by decision, in `docs/deployment-ceiling.md`, and it is
 not built to absorb that. An amplification where a small input costs the
 deployment a large amount of work is a different thing and is in scope.
 
-Social engineering of the maintainer, physical access, and anything requiring the
+Social engineering aimed at me, physical access, and anything requiring the
 operator to run something they were told not to run.
 
 ## Which versions get a fix

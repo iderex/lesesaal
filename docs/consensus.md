@@ -260,8 +260,8 @@ For a rule that weights volunteers: a per volunteer identifier on each
 classification, stable within a campaign. This project's own rule reads no such
 identifier, so a plain count is recomputable from an export that carries nothing
 at all about people. Whether the export carries one anyway is not decided here
-and is not assumed in either direction. It is entry 3 of #1, it belongs to the
-maintainer, and #15 records what the export ends up carrying.
+and is not assumed in either direction. It is entry 3 of #1, it is mine to
+answer, and #15 records what the export ends up carrying.
 
 The file that holds all of this is #68's and its provenance is #69's. Both take
 the field list from here rather than assembling a second one.

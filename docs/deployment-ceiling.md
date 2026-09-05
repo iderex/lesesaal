@@ -62,8 +62,8 @@ five, in order, and a proposal that cannot answer one has failed at that one.
    described, or it does not, and the proposal says plainly that the one command
    now has a second way to fail.
 
-5. Name who decided. Adding a service to the default deployment is a maintainer
-   decision. A reviewer may not grant it, and neither may the person proposing
+5. Name who decided. Adding a service to the default deployment is a decision
+   I take. A reviewer may not grant it, and neither may the person proposing
    it.
 
 An optional service does not skip 1 to 3. It answers 4 by construction, which is

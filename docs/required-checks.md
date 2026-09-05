@@ -1,7 +1,7 @@
 # The checks to require on the protected branch
 
 Requested in issue #31. This document is the request. It changes no setting,
-because the ruleset is the maintainer's to edit and nothing here can edit it.
+because the ruleset is mine to edit and nothing here can edit it.
 
 ## What the branch refuses today
 
